@@ -1,7 +1,7 @@
 ---
 name: benchmark-e2e
-description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (hard-fraud or hard-attrition) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
-argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|hard-fraud|hard-attrition] [--dataset PATH] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
+description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (hard-fraud, hard-attrition, or xhard-churn) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
+argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|hard-fraud|hard-attrition|xhard-churn] [--dataset PATH] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
 disable-model-invocation: true
 ---
 
@@ -29,9 +29,9 @@ Target: `$ARGUMENTS`
 
 Determine one scenario before benchmarking:
 
-- If `--scenario hard-fraud` or `--scenario hard-attrition` is passed, use it.
+- If `--scenario hard-fraud`, `--scenario hard-attrition`, or `--scenario xhard-churn` is passed, use it.
 - Otherwise (`--scenario auto` or omitted), classify automatically using [references/scenarios.md](references/scenarios.md).
-- You must select exactly one scenario: `hard-fraud` or `hard-attrition`.
+- You must select exactly one scenario: `hard-fraud`, `hard-attrition`, or `xhard-churn`.
 - Never run both scenarios in one invocation.
 
 If classification is ambiguous, default to `hard-attrition` and explain why.
@@ -118,7 +118,7 @@ The HTML report is a self-contained scorecard with the results table, stage cove
 E2E Benchmark Report
 ====================
 Matrix: <modes x 1 scenario>
-Selected scenario: <hard-fraud|hard-attrition> (detection: <auto|user-forced>)
+Selected scenario: <hard-fraud|hard-attrition|xhard-churn> (detection: <auto|user-forced>)
 Runs per cell: <N>
 Primary metric: <metric>
 

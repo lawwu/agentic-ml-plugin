@@ -1,6 +1,6 @@
-# Machine Learning Skills
+# Agentic ML Plugin
 
-Agent skills for machine learning workflows, following the [Agent Skills](https://agentskills.io) open format.
+Agent skills for machine learning workflows for Claude Code and other agenic coding harnesses.
 
 ## Installation
 

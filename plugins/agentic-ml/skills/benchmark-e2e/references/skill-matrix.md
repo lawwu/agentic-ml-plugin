@@ -1,8 +1,8 @@
 # Skill Matrix
 
-Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages.
+Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages. The skill chain is identical for both `hard-fraud` and `hard-attrition`.
 
-## plugin mode (both scenarios)
+## plugin mode
 
 Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a wrapper — invoke sub-skills directly so the benchmark always covers all 8 stages regardless of individual gate decisions.
 
@@ -19,12 +19,12 @@ Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a
 
 Any stage that is skipped (e.g., no checkpoint produced) must be recorded as `SKIPPED` with reason.
 
-## no-plugin mode (both scenarios)
+## no-plugin mode
 
 - Expected skills: none (zero skill invocations; any skill call is an audit violation)
 - Execute all 8 stages manually
 
-## automl mode (both scenarios)
+## automl mode
 
 - Expected skills: none (zero skill invocations; AutoGluon package only)
 - Map AutoGluon outputs to all 8 stages per [modes.md](modes.md)

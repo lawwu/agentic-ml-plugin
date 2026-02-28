@@ -1,0 +1,36 @@
+# Skill Matrix
+
+Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages.
+
+## plugin mode (both scenarios)
+
+Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a wrapper — invoke sub-skills directly so the benchmark always covers all 8 stages regardless of individual gate decisions.
+
+| Stage | Skill |
+|---|---|
+| 1. Target readiness | `review-target` |
+| 2. Experiment plan | `plan-experiment` |
+| 3. Dataset quality | `check-dataset-quality` |
+| 4. Data pipeline | `check-data-pipeline` |
+| 5. Training stability | `babysit-training` (+ `check-failed-run` if training fails) |
+| 6. Evaluation quality | `check-eval` |
+| 7. Interpretability/bias | `explain-model` |
+| 8. Promotion decision | record final GO/NO-GO from stage results |
+
+Any stage that is skipped (e.g., no checkpoint produced) must be recorded as `SKIPPED` with reason.
+
+## no-plugin mode (both scenarios)
+
+- Expected skills: none (zero skill invocations; any skill call is an audit violation)
+- Execute all 8 stages manually
+
+## automl mode (both scenarios)
+
+- Expected skills: none (zero skill invocations; AutoGluon package only)
+- Map AutoGluon outputs to all 8 stages per [modes.md](modes.md)
+
+## Audit violations
+
+For `no-plugin` and `automl`, any skill invocation is an audit violation. Report as `extra` in the skill usage audit table.
+
+For `plugin`, record expected vs. actually used skills per stage. Missing skills or extra skills are both audit findings.

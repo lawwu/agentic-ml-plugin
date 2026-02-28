@@ -282,11 +282,11 @@ def render_skill_audit(data: dict) -> str:
         rows.append(
             f"<tr>"
             f"<td>{entry.get('mode','?')}</td>"
-            f"<td>{', '.join(entry.get('expected','[]')) or '<span class=\"muted\">none</span>'}</td>"
-            f"<td>{', '.join(entry.get('actual','[]')) or '<span class=\"muted\">none</span>'}</td>"
-            f"<td>{', '.join(entry.get('missing','[]')) or '—'}</td>"
-            f"<td>{', '.join(entry.get('extra','[]')) or '—'}</td>"
-            f"</tr>"
+            + ("<td>" + (", ".join(entry.get("expected", [])) or '<span class="muted">none</span>') + "</td>")
+            + ("<td>" + (", ".join(entry.get("actual", [])) or '<span class="muted">none</span>') + "</td>")
+            + ("<td>" + (", ".join(entry.get("missing", [])) or "—") + "</td>")
+            + ("<td>" + (", ".join(entry.get("extra", [])) or "—") + "</td>")
+            + "</tr>"
         )
     return "\n      ".join(rows)
 
@@ -370,7 +370,8 @@ def main() -> None:
     skill_audit_rows    = render_skill_audit(data)
     findings_section    = render_findings(findings)
     recommendation_html = render_recommendation(recommendation)
-    overall_badge       = f'<span class="badge badge-{decision.lower().replace("-","")}">{decision}</span>'
+    decision_cls        = decision.lower().replace("-", "")
+    overall_badge       = f'<span class="badge badge-{decision_cls}">{decision}</span>'
 
     html = HTML_TEMPLATE.format(
         run_id=run_id,

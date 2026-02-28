@@ -7,7 +7,7 @@ Agent skills for machine learning workflows, following the [Agent Skills](https:
 ### Claude Code
 
 ```bash
-claude plugin marketplace add lawwu/agentic-ml
+claude plugin marketplace add lawwu/agentic-ml-plugin
 claude plugin install agentic-ml@agentic-ml
 ```
 

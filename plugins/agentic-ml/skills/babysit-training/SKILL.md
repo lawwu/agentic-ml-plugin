@@ -2,7 +2,6 @@
 name: babysit-training
 description: Continuously monitors a machine learning training run (local, remote, or cloud) until it completes or hits a critical issue. Supports local log files, SSH targets, process names, Vertex AI Pipeline jobs, and Vertex AI Custom training jobs. Run this automatically whenever a training job is started or handed off — poll for anomalies, report progress, and escalate issues without waiting to be asked.
 argument-hint: "[log-file | user@host:path | --pid PID | --proc NAME | --vertex-pipeline JOB | --vertex-training JOB] [--project PROJECT] [--region REGION] [--interval SECONDS]"
-disable-model-invocation: true
 ---
 
 # Check Training

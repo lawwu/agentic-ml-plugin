@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agentic-ml",
+  "description": "Machine learning skills for Claude Code",
+  "owner": {
+    "name": "Lawrence Wu"
+  },
+  "plugins": [
+    {
+      "name": "agentic-ml",
+      "description": "Skills for machine learning workflows: dataset auditing, pipeline validation, training supervision, failure diagnosis, and evaluation",
+      "author": {
+        "name": "Lawrence Wu"
+      },
+      "source": "./plugins/agentic-ml",
+      "category": "productivity"
+    }
+  ]
+}

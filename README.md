@@ -76,12 +76,12 @@ See [AGENTS.md](AGENTS.md) for full instructions, frontmatter reference, naming 
 
 Quick path: create `plugins/agentic-ml/skills/<skill-name>/SKILL.md`, add frontmatter, write instructions, then update the table above.
 
-### Where Skills Belong
+### Test the Plugin Locally
 
-| Scope | Location |
-|-------|----------|
-| **General ML** — useful across projects | This repository |
-| **Project-specific** — only relevant to one codebase | `.claude/skills/` in that repository |
+```
+claude --plugin-dir ./plugins/agentic-ml
+```
+
 
 ## References
 

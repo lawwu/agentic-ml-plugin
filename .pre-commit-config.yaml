@@ -13,6 +13,8 @@ repos:
       - id: pretty-format-json
         args: [--autofix, --no-sort-keys]
       - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main]
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.47.0

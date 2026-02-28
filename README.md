@@ -22,6 +22,14 @@ claude plugin update agentic-ml@agentic-ml
 
 Or run `/plugin` to open the plugin manager.
 
+### Other agents (Cursor, Cline, GitHub Copilot, and others)
+
+For agents supporting the [skills.sh](https://skills.sh) ecosystem:
+
+```bash
+npx skills add lawwu/agentic-ml-plugin
+```
+
 ### Local Development
 
 ```bash

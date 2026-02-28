@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Run Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --go: #16a34a; --go-bg: #dcfce7; --go-border: #86efac;
+    --nogo: #dc2626; --nogo-bg: #fee2e2; --nogo-border: #fca5a5;
+    --cond: #d97706; --cond-bg: #fef3c7; --cond-border: #fcd34d;
+    --pass: #16a34a; --fail: #dc2626; --skipped: #9ca3af; --pending: #6b7280;
+    --blocker: #dc2626; --high: #ea580c; --medium: #d97706; --low: #6b7280;
+    --bg: #f9fafb; --card: #ffffff; --border: #e5e7eb; --text: #111827;
+    --muted: #6b7280; --code-bg: #f3f4f6;
+  }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  header { background: #1e293b; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 600; flex: 1; min-width: 200px; }
+  .run-meta { font-size: 12px; color: #94a3b8; }
+  .badge { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 9999px; font-weight: 700; font-size: 13px; border: 2px solid; }
+  .badge-GO    { color: var(--go);   background: var(--go-bg);   border-color: var(--go-border); }
+  .badge-NOGO  { color: var(--nogo); background: var(--nogo-bg); border-color: var(--nogo-border); }
+  .badge-CONDITIONAL { color: var(--cond); background: var(--cond-bg); border-color: var(--cond-border); }
+  .badge-PENDING { color: var(--pending); background: #f3f4f6; border-color: #d1d5db; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  section h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+
+  /* Gate timeline */
+  .gate-timeline { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding-bottom: 8px; }
+  .gate-item { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 90px; position: relative; }
+  .gate-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 18px; left: 55%; width: 90%; height: 2px;
+    background: var(--border); z-index: 0;
+  }
+  .gate-circle {
+    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; z-index: 1;
+    border: 2px solid; cursor: pointer; transition: transform 0.15s;
+  }
+  .gate-circle:hover { transform: scale(1.1); }
+  .gate-circle.PASS    { background: var(--go-bg);   color: var(--go);   border-color: var(--go); }
+  .gate-circle.FAIL    { background: var(--nogo-bg); color: var(--nogo); border-color: var(--nogo); }
+  .gate-circle.SKIPPED { background: #f3f4f6; color: var(--skipped); border-color: var(--skipped); }
+  .gate-circle.PENDING { background: #f3f4f6; color: var(--pending);  border-color: var(--pending); }
+  .gate-label { font-size: 11px; text-align: center; margin-top: 6px; color: var(--muted); max-width: 88px; word-break: break-word; }
+  .gate-decision-badge { font-size: 10px; font-weight: 600; margin-top: 2px; }
+
+  /* Summary panel */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .summary-kv { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; }
+  .summary-kv .key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-kv .val { font-size: 14px; font-weight: 600; margin-top: 2px; word-break: break-word; }
+
+  /* Skill cards */
+  .skill-cards { display: flex; flex-direction: column; gap: 12px; }
+  .skill-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .skill-card-header {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    cursor: pointer; user-select: none; background: var(--code-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .skill-card-header:hover { background: #e9eaf0; }
+  .skill-card-header h3 { flex: 1; font-size: 14px; font-weight: 600; font-family: monospace; }
+  .skill-card-header .duration { font-size: 12px; color: var(--muted); }
+  .chevron { transition: transform 0.2s; font-size: 12px; color: var(--muted); }
+  .skill-card-header.open .chevron { transform: rotate(180deg); }
+  .skill-card-body { padding: 16px; display: none; }
+  .skill-card-body.open { display: block; }
+
+  /* Findings table */
+  .findings-table, .results-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .findings-table th, .results-table th { text-align: left; font-weight: 600; padding: 6px 10px; background: var(--code-bg); border-bottom: 2px solid var(--border); }
+  .findings-table td, .results-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .findings-table tr:last-child td, .results-table tr:last-child td { border-bottom: none; }
+  .sev-blocker { color: var(--blocker); font-weight: 700; }
+  .sev-high    { color: var(--high);    font-weight: 600; }
+  .sev-medium  { color: var(--medium);  font-weight: 600; }
+  .sev-low     { color: var(--low); }
+
+  /* Next commands */
+  .next-cmds { margin-top: 12px; }
+  .next-cmds h4 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .cmd-block { background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .copy-btn { cursor: pointer; background: #334155; border: none; color: #94a3b8; border-radius: 4px; padding: 2px 8px; font-size: 11px; flex-shrink: 0; }
+  .copy-btn:hover { background: #475569; color: white; }
+
+  /* Raw JSON tab */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .tab { padding: 6px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--muted); }
+  .tab.active { color: var(--text); border-bottom-color: #1e293b; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  pre.json { background: #1e293b; color: #e2e8f0; font-size: 12px; padding: 12px; border-radius: 6px; overflow: auto; max-height: 400px; white-space: pre-wrap; word-break: break-all; }
+
+  /* Data tables */
+  .data-section { margin-top: 14px; }
+  .data-section h4 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+  /* Blockers/risks */
+  .blockers-list { list-style: none; }
+  .blockers-list li { padding: 6px 10px; border-left: 3px solid var(--nogo); background: var(--nogo-bg); margin-bottom: 4px; border-radius: 0 4px 4px 0; font-size: 13px; }
+  .risks-list li { border-left-color: var(--cond); background: var(--cond-bg); }
+
+  /* Empty state */
+  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  /* Positive delta */
+  .delta-pos { color: var(--go); }
+  .delta-neg { color: var(--nogo); }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+    <h1 id="header-title">ML Run Report</h1>
+    <div class="run-meta" id="header-meta"></div>
+  </div>
+  <div id="header-badge"></div>
+</header>
+
+<main>
+  <!-- Gate Timeline -->
+  <section>
+    <h2>Gate Timeline</h2>
+    <div class="gate-timeline" id="gate-timeline"></div>
+  </section>
+
+  <!-- Summary Panel -->
+  <section>
+    <h2>Run Summary</h2>
+    <div class="summary-grid" id="summary-grid"></div>
+    <div id="blockers-risks" style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;"></div>
+  </section>
+
+  <!-- Per-skill cards -->
+  <section>
+    <h2>Skill Reports</h2>
+    <div class="skill-cards" id="skill-cards"></div>
+  </section>
+</main>
+
+<script>
+// ── Embedded data (injected by generate_report.py) ─────────────────────────
+const EMBEDDED_DATA = null;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function decisionClass(d) {
+  if (d === 'GO') return 'badge-GO';
+  if (d === 'NO-GO') return 'badge-NOGO';
+  if (d === 'CONDITIONAL') return 'badge-CONDITIONAL';
+  return 'badge-PENDING';
+}
+
+function badge(d) {
+  return `<span class="badge ${decisionClass(d)}">${esc(d)}</span>`;
+}
+
+function severityClass(s) {
+  return 'sev-' + (s || 'low');
+}
+
+function fmtDuration(seconds) {
+  if (!seconds) return '';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s`;
+  return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard?.writeText(text).catch(() => {});
+}
+
+// ── Gate Timeline ────────────────────────────────────────────────────────────
+function renderGateTimeline(gates) {
+  const el = document.getElementById('gate-timeline');
+  if (!gates || !gates.length) {
+    el.innerHTML = '<span class="empty">No gate data available</span>';
+    return;
+  }
+  el.innerHTML = gates.map((g, i) => {
+    const status = g.status || 'PENDING';
+    const dec = g.decision || '';
+    const label = (g.gate_name || '').replace(/-/g, '\u2011'); // non-breaking hyphens
+    const num = g.gate_number || (i + 1);
+    return `
+      <div class="gate-item" title="${esc(g.gate_name)}">
+        <div class="gate-circle ${esc(status)}" onclick="scrollToSkill('${esc(g.gate_name)}')">${num}</div>
+        <div class="gate-label">${esc(label)}</div>
+        <div class="gate-decision-badge" style="color:${decisionColor(dec)}">${esc(dec)}</div>
+      </div>`;
+  }).join('');
+}
+
+function decisionColor(d) {
+  if (d === 'GO') return 'var(--go)';
+  if (d === 'NO-GO') return 'var(--nogo)';
+  if (d === 'CONDITIONAL') return 'var(--cond)';
+  return 'var(--muted)';
+}
+
+function scrollToSkill(name) {
+  const card = document.getElementById('card-' + name);
+  if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+// ── Summary Panel ────────────────────────────────────────────────────────────
+function renderSummary(overall, artifacts) {
+  const grid = document.getElementById('summary-grid');
+  const summaryArt = artifacts['run-summary'] || {};
+
+  const kvs = [
+    ['Run ID', overall.run_id],
+    ['Timestamp', overall.timestamp ? overall.timestamp.replace('T',' ').replace('Z',' UTC').slice(0,22) : ''],
+    ['Objective', overall.objective || summaryArt.objective || ''],
+    ['Decision', overall.decision],
+    ['Confidence', overall.confidence || ''],
+    ['Data source', summaryArt.data_source || ''],
+    ['Label', summaryArt.label_col || ''],
+    ['Primary metric', summaryArt.primary_metric || ''],
+  ].filter(([,v]) => v);
+
+  grid.innerHTML = kvs.map(([k, v]) => `
+    <div class="summary-kv">
+      <div class="key">${esc(k)}</div>
+      <div class="val">${k === 'Decision' ? badge(v) : esc(v)}</div>
+    </div>`).join('');
+
+  const br = document.getElementById('blockers-risks');
+  const blockers = overall.top_blockers || [];
+  const risks = overall.top_risks || [];
+
+  let html = '';
+  if (blockers.length) {
+    html += `<div style="flex:1;min-width:200px"><h4 style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Blockers</h4>
+      <ul class="blockers-list">${blockers.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>`;
+  }
+  if (risks.length) {
+    html += `<div style="flex:1;min-width:200px"><h4 style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Risks</h4>
+      <ul class="blockers-list risks-list">${risks.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>`;
+  }
+  br.innerHTML = html;
+}
+
+// ── Skill Cards ──────────────────────────────────────────────────────────────
+const SKILL_ORDER = [
+  'review-target','plan-experiment','check-dataset-quality','check-data-pipeline',
+  'feature-engineer','babysit-training','check-failed-run','check-eval','explain-model',
+];
+
+function renderSkillCards(artifacts) {
+  const container = document.getElementById('skill-cards');
+  const keys = SKILL_ORDER.filter(k => artifacts[k]);
+  // Also include any extra artifacts not in our known order
+  Object.keys(artifacts).forEach(k => { if (k !== 'run-summary' && !keys.includes(k)) keys.push(k); });
+
+  if (!keys.length) {
+    container.innerHTML = '<span class="empty">No individual skill artifacts found.</span>';
+    return;
+  }
+
+  container.innerHTML = keys.map(name => buildSkillCard(name, artifacts[name])).join('');
+
+  // Wire up toggle
+  container.querySelectorAll('.skill-card-header').forEach(h => {
+    h.addEventListener('click', () => {
+      const body = h.nextElementSibling;
+      const open = body.classList.toggle('open');
+      h.classList.toggle('open', open);
+    });
+  });
+
+  // Wire up tabs
+  container.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const bar = tab.closest('.tab-bar');
+      const panels = bar.nextElementSibling;
+      bar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      panels.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      panels.querySelector(`[data-tab="${tab.dataset.target}"]`).classList.add('active');
+    });
+  });
+
+  // Wire up copy buttons
+  container.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.cmd);
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  });
+}
+
+function buildSkillCard(name, art) {
+  const decision = art.decision || 'PENDING';
+  const duration = art.duration_seconds ? fmtDuration(art.duration_seconds) : '';
+  const summary = art.summary || '';
+
+  return `
+  <div class="skill-card" id="card-${esc(name)}">
+    <div class="skill-card-header">
+      <h3>${esc(name)}</h3>
+      ${badge(decision)}
+      ${duration ? `<span class="duration">${esc(duration)}</span>` : ''}
+      <span class="chevron">▼</span>
+    </div>
+    <div class="skill-card-body">
+      ${summary ? `<p style="margin-bottom:12px;color:var(--muted);font-size:13px">${esc(summary)}</p>` : ''}
+      <div class="tab-bar">
+        <div class="tab active" data-target="details">Details</div>
+        <div class="tab" data-target="raw">Raw JSON</div>
+      </div>
+      <div>
+        <div class="tab-panel active" data-tab="details">
+          ${buildDetailsPanel(name, art)}
+        </div>
+        <div class="tab-panel" data-tab="raw">
+          <pre class="json">${esc(JSON.stringify(art, null, 2))}</pre>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildDetailsPanel(name, art) {
+  let html = '';
+
+  // Findings table
+  const findings = art.findings || [];
+  if (findings.length) {
+    html += `<div class="data-section">
+      <h4>Findings (${findings.length})</h4>
+      <table class="findings-table">
+        <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Description</th><th>Fix</th></tr></thead>
+        <tbody>${findings.map(f => `
+          <tr>
+            <td>${esc(f.id || '')}</td>
+            <td class="${severityClass(f.severity)}">${esc(f.severity || '')}</td>
+            <td><strong>${esc(f.title || '')}</strong></td>
+            <td>${esc(f.description || '')}</td>
+            <td>${esc(f.fix || '')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } else {
+    html += `<p class="empty" style="margin-bottom:12px">No findings.</p>`;
+  }
+
+  // Skill-specific sections
+  html += buildSkillSpecific(name, art);
+
+  // Next commands
+  const cmds = art.next_commands || [];
+  if (cmds.length) {
+    html += `<div class="next-cmds">
+      <h4>Next Commands</h4>
+      ${cmds.map(c => `
+        <div class="cmd-block">
+          <span style="flex:1;word-break:break-all">${esc(c)}</span>
+          <button class="copy-btn" data-cmd="${esc(c)}">Copy</button>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  return html || '<span class="empty">No details available.</span>';
+}
+
+function buildSkillSpecific(name, art) {
+  let html = '';
+
+  if (name === 'check-dataset-quality') {
+    const profile = art.profile || {};
+    if (Object.keys(profile).length) {
+      html += `<div class="data-section"><h4>Profile</h4>
+        <table class="results-table"><thead><tr><th>Split</th><th>Rows</th></tr></thead><tbody>
+          ${['train','validation','test'].filter(s => profile[s+'_rows'] != null).map(s =>
+            `<tr><td>${s}</td><td>${profile[s+'_rows'].toLocaleString()}</td></tr>`
+          ).join('')}
+        </tbody></table>
+        ${profile.label_col ? `<p style="margin-top:8px;font-size:13px;color:var(--muted)">Label: <strong>${esc(profile.label_col)}</strong></p>` : ''}
+      </div>`;
+    }
+    const counts = [
+      ['Blockers', art.blocker_count, 'var(--blocker)'],
+      ['High', art.high_count, 'var(--high)'],
+      ['Medium', art.medium_count, 'var(--medium)'],
+      ['Low', art.low_count, 'var(--low)'],
+    ].filter(([, v]) => v != null);
+    if (counts.length) {
+      html += `<div class="data-section"><h4>Finding Counts</h4>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          ${counts.map(([label, count, color]) =>
+            `<span style="color:${color};font-weight:700;font-size:14px">${esc(count)} <span style="font-weight:400;color:var(--muted)">${esc(label)}</span></span>`
+          ).join('')}
+        </div>
+      </div>`;
+    }
+  }
+
+  if (name === 'check-data-pipeline') {
+    if (art.checks_total != null) {
+      const ratio = `${art.checks_passed ?? '?'} / ${art.checks_total}`;
+      html += `<div class="data-section"><h4>Checks</h4>
+        <p style="font-size:14px"><strong>${esc(ratio)}</strong> passed</p>
+      </div>`;
+    }
+    const failures = art.failures || [];
+    if (failures.length) {
+      html += `<div class="data-section"><h4>Failures</h4>
+        <table class="findings-table">
+          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Fix</th></tr></thead>
+          <tbody>${failures.map(f => `
+            <tr>
+              <td><strong>${esc(f.check || '')}</strong><br><small style="color:var(--muted)">${esc(f.location || '')}</small></td>
+              <td>${esc(f.expected || '')}</td>
+              <td>${esc(f.actual || '')}</td>
+              <td>${esc(f.fix || '')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'check-eval') {
+    const results = art.results || [];
+    if (results.length) {
+      html += `<div class="data-section"><h4>Results</h4>
+        <table class="results-table">
+          <thead><tr><th>Task / Metric</th><th>Score</th><th>Baseline</th><th>Delta</th></tr></thead>
+          <tbody>${results.map(r => {
+            const delta = r.delta != null ? (r.delta >= 0 ? `+${r.delta.toFixed(4)}` : r.delta.toFixed(4)) : '';
+            const deltaClass = r.delta > 0 ? 'delta-pos' : r.delta < 0 ? 'delta-neg' : '';
+            return `<tr>
+              <td>${esc(r.task || '')} / ${esc(r.metric || '')}</td>
+              <td>${r.score != null ? r.score.toFixed(4) : ''}</td>
+              <td>${r.baseline_score != null ? r.baseline_score.toFixed(4) : ''}</td>
+              <td class="${deltaClass}">${esc(delta)}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+    const regressions = art.regressions || [];
+    if (regressions.length) {
+      html += `<div class="data-section"><h4>Regressions</h4>
+        <ul>${regressions.map(r => `<li style="color:var(--nogo)">${esc(r)}</li>`).join('')}</ul>
+      </div>`;
+    }
+  }
+
+  if (name === 'explain-model') {
+    const topFeatures = (art.top_features || []).slice(0, 10);
+    if (topFeatures.length) {
+      html += `<div class="data-section"><h4>Top Features (top ${topFeatures.length})</h4>
+        <table class="results-table">
+          <thead><tr><th>#</th><th>Feature</th><th>Importance</th><th>SHAP |mean|</th></tr></thead>
+          <tbody>${topFeatures.map(f =>
+            `<tr>
+              <td>${esc(f.rank || '')}</td>
+              <td>${esc(f.feature || '')}</td>
+              <td>${f.importance != null ? f.importance.toFixed(4) : ''}</td>
+              <td>${f.shap_mean_abs != null ? f.shap_mean_abs.toFixed(4) : ''}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+    const biasAudit = art.bias_audit || [];
+    if (biasAudit.length) {
+      html += `<div class="data-section"><h4>Bias / Fairness Audit</h4>
+        <table class="results-table">
+          <thead><tr><th>Attribute</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Status</th></tr></thead>
+          <tbody>${biasAudit.map(b =>
+            `<tr>
+              <td>${esc(b.attribute || '')}</td>
+              <td>${esc(b.metric || '')}</td>
+              <td>${b.value != null ? b.value.toFixed(3) : ''}</td>
+              <td>${b.threshold != null ? b.threshold : ''}</td>
+              <td style="color:${b.passed ? 'var(--go)' : 'var(--nogo)'};font-weight:600">${b.passed ? 'PASS' : 'FAIL'}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'babysit-training') {
+    const anomalies = art.anomalies_detected || [];
+    if (anomalies.length) {
+      html += `<div class="data-section"><h4>Anomalies Detected</h4>
+        <table class="findings-table">
+          <thead><tr><th>Step</th><th>Type</th><th>Severity</th><th>Description</th><th>Action</th></tr></thead>
+          <tbody>${anomalies.map(a =>
+            `<tr>
+              <td>${esc(a.step || '')}</td>
+              <td>${esc(a.type || '')}</td>
+              <td class="${severityClass(a.severity)}">${esc(a.severity || '')}</td>
+              <td>${esc(a.description || '')}</td>
+              <td>${esc(a.action_taken || 'none')}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+    const finalMetrics = art.final_metrics || {};
+    if (Object.keys(finalMetrics).length) {
+      html += `<div class="data-section"><h4>Final Metrics</h4>
+        <table class="results-table">
+          <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+          <tbody>${Object.entries(finalMetrics).map(([k, v]) =>
+            `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'check-failed-run') {
+    if (art.primary_cause) {
+      html += `<div class="data-section"><h4>Failure Analysis</h4>
+        <table class="results-table">
+          <tbody>
+            <tr><td><strong>Status</strong></td><td>${esc(art.run_status || '')}</td></tr>
+            <tr><td><strong>Primary cause</strong></td><td>${esc(art.primary_cause || '')} (confidence: ${esc(art.primary_cause_confidence ?? '')})</td></tr>
+            <tr><td><strong>Contributing factors</strong></td><td>${(art.contributing_factors || []).join(', ') || 'none'}</td></tr>
+            <tr><td><strong>Root cause</strong></td><td>${esc(art.root_cause || '')}</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+    }
+    const fixes = art.fixes || [];
+    if (fixes.length) {
+      html += `<div class="data-section"><h4>Proposed Fixes</h4>
+        <table class="findings-table">
+          <thead><tr><th>Action</th><th>Risk</th><th>Expected Impact</th><th>Validate</th></tr></thead>
+          <tbody>${fixes.map(f =>
+            `<tr>
+              <td>${esc(f.action || '')}</td>
+              <td style="color:${f.risk === 'dangerous' ? 'var(--nogo)' : f.risk === 'needs-approval' ? 'var(--cond)' : 'var(--go)'};font-weight:600">${esc(f.risk || '')}</td>
+              <td>${esc(f.expected_impact || '')}</td>
+              <td>${esc(f.validate || '')}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'plan-experiment') {
+    const candidates = art.candidates || [];
+    if (candidates.length) {
+      html += `<div class="data-section"><h4>Model Candidates</h4>
+        <table class="results-table">
+          <thead><tr><th>#</th><th>Model Family</th><th>Rationale</th><th>Est. GPU-hrs</th><th>Est. Cost</th></tr></thead>
+          <tbody>${candidates.map(c =>
+            `<tr>
+              <td>${esc(c.rank || '')}</td>
+              <td><strong>${esc(c.model_family || '')}</strong></td>
+              <td>${esc(c.rationale || '')}</td>
+              <td>${c.estimated_gpu_hours != null ? c.estimated_gpu_hours : ''}</td>
+              <td>${c.estimated_cost_usd != null ? '$' + c.estimated_cost_usd : ''}</td>
+            </tr>`
+          ).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'review-target') {
+    const contract = art.prediction_contract || {};
+    if (Object.keys(contract).length) {
+      html += `<div class="data-section"><h4>Prediction Contract</h4>
+        <table class="results-table">
+          <tbody>
+            ${Object.entries(contract).map(([k, v]) => `<tr><td><strong>${esc(k)}</strong></td><td>${esc(v)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  if (name === 'feature-engineer') {
+    const baseFt = art.baseline_feature_set || [];
+    if (baseFt.length) {
+      html += `<div class="data-section"><h4>Baseline Feature Set</h4>
+        <ul style="padding-left:16px">${baseFt.map(f => `<li style="font-size:13px">${esc(f)}</li>`).join('')}</ul>
+      </div>`;
+    }
+    const blocked = art.blocked_features || [];
+    if (blocked.length) {
+      html += `<div class="data-section"><h4>Blocked Features</h4>
+        <table class="results-table">
+          <thead><tr><th>Feature</th><th>Reason</th></tr></thead>
+          <tbody>${blocked.map(b => `<tr><td>${esc(b.feature || '')}</td><td style="color:var(--nogo)">${esc(b.reason || '')}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  return html;
+}
+
+// ── Main init ────────────────────────────────────────────────────────────────
+function init() {
+  const data = EMBEDDED_DATA;
+  if (!data) {
+    document.querySelector('main').innerHTML =
+      '<section><p style="color:var(--nogo);font-weight:600">No data embedded. Run generate_report.py to create a populated report.</p></section>';
+    return;
+  }
+
+  const { overall, artifacts } = data;
+
+  // Header
+  document.getElementById('header-title').textContent =
+    `ML Run Report — ${overall.run_id || 'unknown'}`;
+  document.getElementById('header-meta').textContent =
+    `Generated ${data.generated_at ? data.generated_at.replace('T',' ').slice(0,19) + ' UTC' : ''}`;
+  document.getElementById('header-badge').innerHTML = badge(overall.decision || 'PENDING');
+
+  renderGateTimeline(overall.gates || []);
+  renderSummary(overall, artifacts);
+  renderSkillCards(artifacts);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

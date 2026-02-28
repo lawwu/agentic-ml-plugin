@@ -1,0 +1,8 @@
+{
+  "name": "agentic-ml",
+  "description": "Skills for machine learning workflows: monitoring training runs, debugging models, and managing experiments.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Lawrence Wu"
+  }
+}

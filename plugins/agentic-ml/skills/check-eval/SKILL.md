@@ -53,6 +53,7 @@ If the checkpoint is invalid or incomplete, stop and report the specific missing
 For HF Trainer-based eval: write a short eval script using patterns from [references/hf-eval-patterns.md](references/hf-eval-patterns.md).
 
 For lm-evaluation-harness: compose the `lm_eval` CLI command from [references/harness-reference.md](references/harness-reference.md). Always include:
+
 - `--output_path` for reproducible result capture
 - `--log_samples` for task-level debug
 - `--batch_size auto` unless `--batch-size` is specified
@@ -201,6 +202,7 @@ No baseline provided. Use --baseline to compute deltas.
 Write `check-eval.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` / `NO-GO` / `CONDITIONAL`
 - `results`: one entry per task/metric with score, baseline, delta, and regressed flag
 - `regressions`: list of metric names that regressed vs. baseline

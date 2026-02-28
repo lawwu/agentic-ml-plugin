@@ -4,6 +4,7 @@ TODO.md
 # Reports and run outputs
 reports/
 demo/scenarios/**/*.md
+demo/scenarios/**/*.csv
 
 # Secrets
 .env

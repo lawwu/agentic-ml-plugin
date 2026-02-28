@@ -34,6 +34,7 @@ df = pd.read_csv(path, sep=dialect.delimiter)
 ```
 
 **Pitfalls**:
+
 - Default `dtype` inference can silently coerce types (e.g., `"NA"` → NaN, `"1e5"` → float)
 - Use `dtype=str` for initial load if doing type auditing
 - Leading/trailing whitespace in column names: use `df.columns = df.columns.str.strip()`
@@ -70,6 +71,7 @@ print(f"rows={metadata.num_rows}, row_groups={metadata.num_row_groups}")
 ```
 
 **Pitfalls**:
+
 - Parquet preserves dtypes precisely — check for `int32` vs `int64`, `float32` vs `float64`
 - Corrupt row groups cause `ArrowInvalid` — test with `pq.read_metadata` first
 - Snappy/gzip/zstd compressed: transparent to pandas, but affects I/O speed
@@ -110,6 +112,7 @@ df = pd.DataFrame(rows)
 ```
 
 **Pitfalls**:
+
 - Mixed schema across lines → `pd.read_json(lines=True)` will produce NaN for missing keys
 - Deeply nested JSON → flatten with `pd.json_normalize()`
 - Unicode escapes in text fields → validate with `ftfy.fix_text()` if expecting clean text
@@ -148,6 +151,7 @@ print(builder.info.features)
 ```
 
 **Pitfalls**:
+
 - HF datasets cache at `~/.cache/huggingface/datasets/` — disk usage can be large
 - `streaming=True` does not support `.shuffle()` efficiently
 - Some datasets require `trust_remote_code=True` → confirm source before using
@@ -193,6 +197,7 @@ for _, row in sample.iterrows():
 ```
 
 **Pitfalls**:
+
 - `img.verify()` closes the file — reopen if you need pixel data after verification
 - Truncated images pass `verify()` but fail on pixel access — use `img.load()` instead
 - Mixed image modes (RGB, RGBA, L, P) → normalize with `img.convert("RGB")`
@@ -333,6 +338,7 @@ FROM {table}
 ```
 
 **Pitfalls**:
+
 - `ORDER BY RANDOM()` on PostgreSQL is slow on large tables — use `TABLESAMPLE BERNOULLI` instead
 - BigQuery ADC requires `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth application-default login`
 - Snowflake connector needs `snowflake-sqlalchemy` + `snowflake-connector-python`

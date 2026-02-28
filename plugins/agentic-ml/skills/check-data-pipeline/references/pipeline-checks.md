@@ -78,6 +78,7 @@ Reference for the `data-pipeline-validate` skill. Full check specifications with
 | EOS handling | EOS token present and labeled (not masked) |
 
 **Check**:
+
 ```python
 # Verify label shift
 assert (labels[:, :-1] == input_ids[:, 1:]).all(), "Labels are not shifted input_ids"
@@ -108,6 +109,7 @@ assert (labels[:, -1] == -100).all(), "Last label position must be -100"
 | No BOS | `decoder_start_token_id` is in `decoder_input_ids`, not `labels` |
 
 **Check**:
+
 ```python
 assert decoder_input_ids[:, 0].eq(model.config.decoder_start_token_id).all()
 assert (labels == tokenizer.pad_token_id).sum() == 0, "Use -100, not pad_token_id for labels"

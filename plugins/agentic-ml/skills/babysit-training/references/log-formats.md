@@ -14,11 +14,13 @@ Default format (JSON-like, printed to stdout):
 ```
 
 Progress bar format (tqdm):
+
 ```
   12%|████▌                                | 1200/10000 [08:21<1:00:23, 2.43it/s]
 ```
 
 **Extraction**:
+
 - Parse JSON-like dicts for `loss`, `grad_norm`, `learning_rate`, `epoch`
 - For step count, parse `it/s` and progress bar or look for `step` key
 
@@ -27,11 +29,13 @@ Progress bar format (tqdm):
 ## PyTorch Lightning
 
 Default format:
+
 ```
 Epoch 1:  12%|███▌              | 120/1000 [00:45<05:32, 2.65it/s, v_num=0, train_loss=2.34]
 ```
 
 Or with explicit logging:
+
 ```
 [2024-01-15 10:03:21,451][INFO] - Epoch 1, step 120: train_loss=2.341 val_loss=2.891
 ```
@@ -68,6 +72,7 @@ Epoch 1/10
 ```
 
 Or:
+
 ```
 Step 100: loss = 2.3415
 ```
@@ -79,11 +84,13 @@ Step 100: loss = 2.3415
 ## JAX / Flax (with Orbax or custom)
 
 Typically custom structured logs:
+
 ```
 step 100: loss=2.341, lr=0.0003, grad_norm=0.87, steps/sec=12.3
 ```
 
 Or JSON:
+
 ```json
 {"step": 100, "metrics": {"loss": 2.341, "accuracy": 0.483}, "lr": 0.0003}
 ```
@@ -99,6 +106,7 @@ srun: Job step aborted: Waiting up to 62 seconds for job step to finish.
 ```
 
 Watch for SLURM signals:
+
 - `PREEMPTION` — job was preempted
 - `TIME LIMIT` — approaching wall time
 - `Killed` — OOM killer or SIGKILL
@@ -110,6 +118,7 @@ Also check `squeue -j <jobid>` to see job state.
 ## Weights & Biases (W&B)
 
 W&B itself doesn't write a training log; it uploads metrics via the SDK. To monitor:
+
 - Use `wandb` CLI: `wandb sync --sync-all` or query the API
 - Or tail the local wandb run dir: `~/.wandb/` or `./wandb/run-*/logs/debug.log`
 

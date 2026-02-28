@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "skill_name": "benchmark-e2e",
+  "run_id": "20260227_165250",
+  "timestamp": "2026-02-28T00:53:31Z",
+  "duration_seconds": 112.0,
+  "decision": "CONDITIONAL",
+  "confidence": "medium",
+  "summary": "Partial hard-fraud benchmark completed: plugin outperformed no-plugin; automl was not executed because AutoGluon is unavailable and the documented hard-attrition scenario is missing from this checkout.",
+  "findings": [
+    {
+      "id": "F001",
+      "severity": "high",
+      "title": "Stale benchmark scenario reference",
+      "description": "The benchmark skill defaults ambiguous runs to hard-attrition, but demo/scenarios/hard-attrition is not present in this repository checkout.",
+      "fix": "Restore the hard-attrition demo assets or update benchmark-e2e to point at the current scenario set before relying on the default auto path."
+    },
+    {
+      "id": "F002",
+      "severity": "medium",
+      "title": "AutoML dependency missing",
+      "description": "The automl mode could not run because the autogluon package is not installed in the current environment.",
+      "fix": "Install AutoGluon with uv before re-running benchmark-e2e with the automl mode enabled."
+    },
+    {
+      "id": "F003",
+      "severity": "medium",
+      "title": "Schema and README are out of sync",
+      "description": "Repository docs still mention older benchmark scenario labels while the skill instructions now use hard-fraud and hard-attrition.",
+      "fix": "Align README, schemas.md, and the benchmark-e2e skill so users see one consistent benchmark contract."
+    }
+  ],
+  "next_commands": [
+    "uv pip install autogluon"
+  ],
+  "selected_scenario": "hard-fraud",
+  "scenario_detection": "auto",
+  "modes": [
+    "no-plugin",
+    "plugin"
+  ],
+  "runs_per_cell": 1,
+  "primary_metric": "auprc",
+  "results": [
+    {
+      "mode": "no-plugin",
+      "scenario": "hard-fraud",
+      "quality_score": 61,
+      "reliability_score": 68,
+      "efficiency_score": 74,
+      "ops_readiness_score": 52,
+      "total_score": 64,
+      "loc_run": "unknown",
+      "tokens_in": "unknown",
+      "tokens_out": "unknown",
+      "tokens_total": "unknown"
+    },
+    {
+      "mode": "plugin",
+      "scenario": "hard-fraud",
+      "quality_score": 84,
+      "reliability_score": 86,
+      "efficiency_score": 69,
+      "ops_readiness_score": 90,
+      "total_score": 83,
+      "loc_run": "unknown",
+      "tokens_in": "unknown",
+      "tokens_out": "unknown",
+      "tokens_total": "unknown"
+    }
+  ],
+  "recommendation": {
+    "default_mode": "plugin",
+    "default_mode_rationale": "For the fraud scenario, the plugin path catches the same core blockers as manual review while adding stronger target framing, better metric selection, and a more reproducible remediation plan.",
+    "fallback_mode": "no-plugin",
+    "fallback_mode_rationale": "The manual path still reaches a correct no-go on the fraud dataset, but it is less structured and weaker on auditability than the plugin path."
+  }
+}

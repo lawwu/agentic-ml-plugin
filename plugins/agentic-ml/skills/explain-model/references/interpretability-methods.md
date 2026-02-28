@@ -24,22 +24,26 @@ Reference for `explain-model`. Use this guide to select the right importance met
 **What it measures**: each feature's marginal contribution to a prediction, averaged over all feature orderings (Shapley values from cooperative game theory).
 
 **Pros**:
+
 - theoretically grounded (efficiency, symmetry, dummy, additivity properties)
 - consistent: if a model relies more on a feature, SHAP value increases
 - supports both global (mean |SHAP|) and local (per-instance) explanations
 - `TreeExplainer` is O(TLD²) — fast for trees
 
 **Cons**:
+
 - `KernelExplainer` is O(N²) — slow for large datasets/many features
 - correlated features share SHAP mass, making individual attribution ambiguous
 - `DeepExplainer` requires background dataset; results vary with background choice
 
 **When to use**:
+
 - tree ensembles: always prefer `TreeExplainer`
 - neural networks with tabular input: `DeepExplainer` or `GradientExplainer`
 - any model where you need local + global explanations
 
 **Code pattern**:
+
 ```python
 import shap
 explainer = shap.TreeExplainer(model)
@@ -54,21 +58,25 @@ shap.summary_plot(shap_values, X_val)
 **What it measures**: drop in model performance when a feature's values are randomly shuffled, breaking its relationship with the target.
 
 **Pros**:
+
 - model-agnostic: works with any sklearn-compatible model
 - directly tied to evaluation metric (you choose the metric)
 - detects features that are useless even if correlated with others
 
 **Cons**:
+
 - can be misleading with correlated features (both may appear unimportant when either alone is sufficient)
 - requires re-running inference N × num_features times — slow for large models
 - results depend on the evaluation split used
 
 **When to use**:
+
 - when no SHAP explainer is available for the model type
 - as a cross-validation check against SHAP (disagreement → correlated features)
 - when you need metric-tied importance (e.g., "how much does removing this feature hurt F1?")
 
 **Code pattern**:
+
 ```python
 from sklearn.inspection import permutation_importance
 result = permutation_importance(model, X_val, y_val, n_repeats=10, scoring='f1')
@@ -89,16 +97,19 @@ result = permutation_importance(model, X_val, y_val, n_repeats=10, scoring='f1')
 | Decision tree | `feature_importances_` | MDI |
 
 **Pros**:
+
 - zero inference overhead — computed during training
 - very fast
 
 **Cons**:
+
 - MDI is biased toward high-cardinality features
 - not directly comparable across model types
 - does not account for correlated features
 - XGBoost `gain` and `frequency` can give very different rankings
 
 **When to use**:
+
 - as a quick first pass before running SHAP
 - when dataset is too large for SHAP/permutation
 - as a sanity check against SHAP results
@@ -123,6 +134,7 @@ result = permutation_importance(model, X_val, y_val, n_repeats=10, scoring='f1')
 | High ICE variance | Strong interaction with other features |
 
 **Code pattern**:
+
 ```python
 from sklearn.inspection import PartialDependenceDisplay
 PartialDependenceDisplay.from_estimator(model, X_val, features=[0, 1, 2])
@@ -153,6 +165,7 @@ If SHAP and permutation rankings diverge by > 2 positions in the top 10:
 | Calibration gap | Max difference in calibration curves across groups | > 0.05: warning |
 
 Use `fairlearn` or manual computation:
+
 ```python
 from fairlearn.metrics import demographic_parity_ratio, equalized_odds_difference
 ```

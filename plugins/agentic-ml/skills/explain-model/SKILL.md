@@ -155,6 +155,7 @@ Caveats:
 Write `explain-model.json` to `--out-dir` (or `./explain_output/` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` / `CONDITIONAL` / `NO-GO` (maps from old PROMOTE / PROMOTE-WITH-CAVEATS / DO-NOT-PROMOTE)
 - `top_features`, `pdp_summary`, `bias_audit`, `unexpected_patterns`
 - `caveats`: list all caveats when `decision` is `CONDITIONAL`

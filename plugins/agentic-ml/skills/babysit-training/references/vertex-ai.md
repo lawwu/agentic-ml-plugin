@@ -15,6 +15,7 @@ gcloud config set project PROJECT_ID  # set if needed
 ```
 
 The `aiplatform.googleapis.com` service must be enabled:
+
 ```bash
 gcloud services enable aiplatform.googleapis.com
 ```
@@ -35,6 +36,7 @@ gcloud ai pipeline-jobs describe JOB_ID \
 ```
 
 Or using Python SDK:
+
 ```python
 from google.cloud import aiplatform
 aiplatform.init(project="PROJECT_ID", location="us-central1")
@@ -84,6 +86,7 @@ Each task within a pipeline has its own state:
 | `TASK_STATE_CANCELLED` | Cancelled |
 
 Fetch task details via Python SDK:
+
 ```python
 for task in job.task_details:
     print(task.task_name, task.state, task.start_time, task.end_time)
@@ -183,6 +186,7 @@ gcloud logging read \
 ```
 
 Or using Python SDK to stream logs during job:
+
 ```python
 job = aiplatform.CustomJob.get("projects/PROJECT_ID/locations/REGION/customJobs/JOB_ID")
 # job.wait() blocks; for polling, check job.state
@@ -203,6 +207,7 @@ gcloud ai custom-jobs cancel JOB_ID \
 Since Vertex AI jobs can run for hours, the default poll interval is 60 seconds (overridable with `--interval`).
 
 **Recommended polling sequence:**
+
 1. `gcloud ai pipeline-jobs describe` (or `custom-jobs describe`) to get current state
 2. For pipelines: check task-level states in the response
 3. If state is running, fetch last N log lines from Cloud Logging
@@ -211,6 +216,7 @@ Since Vertex AI jobs can run for hours, the default poll interval is 60 seconds 
 6. Sleep for interval, then repeat
 
 **When a task or job enters FAILED state:**
+
 1. Immediately fetch the `error` field from the describe output
 2. Read the last 50 log lines from Cloud Logging for that job/task
 3. Search for the root cause: OOM, Python exception, timeout, data error

@@ -173,6 +173,7 @@ Stop when one of these is true:
 Write `check-failed-run.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` when a safe recovery path exists; `NO-GO` when user approval is required
 - `run_status`, `primary_cause`, `primary_cause_confidence`, `contributing_factors`
 - `evidence`, `root_cause`, `fixes`

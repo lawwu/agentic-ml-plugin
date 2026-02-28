@@ -57,12 +57,14 @@ Do not proceed past a check failure silently — report each failure immediately
 See [references/pipeline-checks.md](references/pipeline-checks.md) for full specs. Core checks:
 
 **Shape and type**
+
 - `input_ids`: shape `(batch, seq_len)`, dtype `int64` (or int32 for TF/JAX)
 - `attention_mask`: same shape as `input_ids`, values in `{0, 1}`
 - `labels`: shape matches task expectation; correct dtype for loss function
 - No `None` dimensions in static shapes (TF/JAX)
 
 **Value ranges**
+
 - `input_ids` values in `[0, vocab_size)` — no out-of-range token IDs
 - `attention_mask` is binary (no float leak)
 - `labels` for classification: values in `[0, num_classes)` or `-100` for ignored positions
@@ -70,6 +72,7 @@ See [references/pipeline-checks.md](references/pipeline-checks.md) for full spec
 - Pixel values (vision): in expected range `[0, 1]` or `[0, 255]` depending on normalization
 
 **Padding and truncation**
+
 - Sequences padded to consistent length within a batch
 - Padding token ID matches `tokenizer.pad_token_id`
 - `attention_mask` is `0` on padding positions
@@ -77,18 +80,21 @@ See [references/pipeline-checks.md](references/pipeline-checks.md) for full spec
 - Truncation preserves meaningful content (check first/last token)
 
 **Special tokens**
+
 - `[CLS]`/`[SEP]` or `<s>`/`</s>` present where expected
 - `[BOS]`/`[EOS]` in generation tasks
 - No special tokens in label sequences for causal LM (or correctly shifted)
 - Decoder input IDs start with `decoder_start_token_id` for seq2seq
 
 **Label encoding**
+
 - Classification: labels are integers, not strings; no label `-1` (use `-100` for ignored)
 - Token classification: label length matches `input_ids` length
 - Seq2seq: labels are shifted correctly; `PAD` positions masked with `-100`
 - Regression: labels are float32 scalars
 
 **Collation**
+
 - All tensors in a batch have consistent shape (no ragged without explicit support)
 - `DataLoader` with `num_workers > 0` produces deterministic output for the same seed
 - No Python objects (lists, dicts) leaking into the batch (would break distributed)
@@ -128,6 +134,7 @@ Confidence: high|medium|low
 Write `check-data-pipeline.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` when all checks pass; `NO-GO` when any failure exists
 - `checks_passed`, `checks_total`, `failures`, `warnings`
 - `findings`: one entry per failure (severity `blocker`) and warning (severity `medium`)

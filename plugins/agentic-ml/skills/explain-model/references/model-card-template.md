@@ -1,6 +1,6 @@
 # Model Card Template
 
-Based on Mitchell et al. 2019 — "Model Cards for Model Reporting" (https://arxiv.org/abs/1810.03993).
+Based on Mitchell et al. 2019 — "Model Cards for Model Reporting" (<https://arxiv.org/abs/1810.03993>).
 
 Use this template as the output target for `explain-model`. Fill all required sections before promotion.
 
@@ -142,16 +142,21 @@ Use this template as the output target for `explain-model`. Fill all required se
 ## Section Guidance
 
 ### Section 2: Intended Use
+
 Be specific about what this model should NOT do. Misuse of ML models often comes from use cases never explicitly ruled out. Err on the side of explicit exclusions.
 
 ### Section 3: Factors
+
 List every group for which performance may differ. If you did not evaluate on a subgroup, say so explicitly — absent evaluation is not the same as absent risk.
 
 ### Section 7: Quantitative Analysis
+
 Disaggregated performance is the most actionable section. If you cannot report it, explain why (e.g., protected attributes not available in holdout data) and flag this as a risk.
 
 ### Section 8: Ethical Considerations
+
 Do not skip this section even for "low-risk" models. Require explicit sign-off from a responsible person before promotion.
 
 ### Section 9: Caveats
+
 Include retraining triggers (data drift thresholds, performance degradation thresholds). Model cards should be living documents updated at each promotion.

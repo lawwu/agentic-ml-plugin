@@ -51,32 +51,38 @@ Report the profile before proceeding to checks.
 Always run these regardless of task type:
 
 **Structural checks**
+
 - Schema consistency: same column names and types across train/validation/test
 - Parse errors: rows that fail to load, truncated JSONL lines, corrupt Parquet row groups
 - Encoding issues: mojibake, null bytes, mixed encodings in text columns
 
 **Missingness**
+
 - Per-column null rate per split
 - Columns with missingness that varies significantly between splits (> 5pp delta)
 - Missing labels (null or empty in `--label-col`)
 
 **Duplicates**
+
 - Exact row duplicates within each split
 - Near-duplicate detection on text column (MinHash or length+prefix heuristic)
 - `--id-col` duplicates within a split (entity appears twice)
 - Cross-split `--id-col` overlap (leakage)
 
 **Label health** (when `--label-col` provided)
+
 - Classification: class distribution, imbalance ratio, rare classes (< 0.5%)
 - Regression: target distribution, extreme skew, zero inflation, impossible values
 - NLP: sequence length distribution, empty sequences, truncation risk at model max_length
 
 **Outliers and value sanity**
+
 - Numeric columns: IQR-based outlier rate, impossible values (negative age, etc.)
 - Text columns: extreme length outliers (< 5 tokens or > 10× median)
 - Image directories: corrupt/unreadable files, extreme aspect ratios, near-zero size
 
 **Leakage checks**
+
 - Direct leakage: `--label-col` value appears verbatim in text features
 - Cross-split entity overlap via `--id-col`
 - Train rows with timestamps newer than validation/test (if timestamp column detected)
@@ -148,6 +154,7 @@ Confidence: high|medium|low
 Write `check-dataset-quality.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` / `NO-GO`
 - `profile`: row/column counts, label distribution
 - `blocker_count`, `high_count`, `medium_count`, `low_count`

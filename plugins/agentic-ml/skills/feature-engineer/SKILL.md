@@ -131,6 +131,7 @@ Next commands:
 Write `feature-engineer.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` / `NO-GO` / `CONDITIONAL`
 - `sources_explored`, `feature_sets`, `blocked_features`, `baseline_feature_set`
 - `findings`: one entry per blocked feature (severity based on risk level) and any structural gaps

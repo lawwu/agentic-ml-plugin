@@ -1,7 +1,7 @@
 ---
 name: benchmark-e2e
-description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (clean Kaggle-style vs messy production-like data) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
-argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|clean-kaggle|messy-data] [--dataset PATH_OR_ID] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
+description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (hard-fraud or hard-attrition) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
+argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|hard-fraud|hard-attrition] [--dataset PATH] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
 disable-model-invocation: true
 ---
 
@@ -14,7 +14,7 @@ Run a structured benchmark of end-to-end ML execution paths and produce a compar
 Arguments (`$ARGUMENTS`) are interpreted as:
 
 - `--modes` — benchmark targets; default: `no-plugin,plugin,automl` (where `automl` maps to AutoGluon; `autogluon` alias accepted)
-- `--scenario` — `auto` (default), `clean-kaggle`, or `messy-data`
+- `--scenario` — `auto` (default), `hard-fraud`, or `hard-attrition`
 - `--dataset` — dataset path/ID (required unless scenario specifies source)
 - `--label-col` — target column
 - `--metric` — primary metric for quality scoring
@@ -29,12 +29,12 @@ Target: `$ARGUMENTS`
 
 Determine one scenario before benchmarking:
 
-- If `--scenario clean-kaggle` or `--scenario messy-data` is passed, use it.
+- If `--scenario hard-fraud` or `--scenario hard-attrition` is passed, use it.
 - Otherwise (`--scenario auto` or omitted), classify automatically using [references/scenarios.md](references/scenarios.md).
-- You must select exactly one scenario: `clean-kaggle` or `messy-data`.
+- You must select exactly one scenario: `hard-fraud` or `hard-attrition`.
 - Never run both scenarios in one invocation.
 
-If classification is ambiguous, choose `messy-data` and explain why.
+If classification is ambiguous, default to `hard-attrition` and explain why.
 
 ### 2. Define benchmark matrix (single scenario)
 
@@ -43,7 +43,7 @@ Build only:
 - Modes: requested subset of `no-plugin`, `plugin`, `automl` (AutoGluon)
 - Scenario: the one selected in step 1
 
-Use [references/datasets.md](references/datasets.md) to select a repeatable benchmark dataset (for example `adult-census-income`) when the user does not provide one.
+Generate the dataset from `demo/scenarios/<scenario>/generate_data.py` when no `--dataset` path is provided. See [references/datasets.md](references/datasets.md) for generation commands and benchmark configuration.
 
 Document any assumptions.
 
@@ -109,7 +109,7 @@ Use [scripts/init-report.sh](scripts/init-report.sh) to initialize report files.
 E2E Benchmark Report
 ====================
 Matrix: <modes x 1 scenario>
-Selected scenario: <clean-kaggle|messy-data> (detection: <auto|user-forced>)
+Selected scenario: <hard-fraud|hard-attrition> (detection: <auto|user-forced>)
 Runs per cell: <N>
 Primary metric: <metric>
 

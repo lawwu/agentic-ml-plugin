@@ -103,6 +103,15 @@ Create:
 
 Use [scripts/init-report.sh](scripts/init-report.sh) to initialize report files.
 
+After writing `benchmark-report.json`, generate the HTML report:
+
+```bash
+uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir>
+# → <run-dir>/benchmark-report.html
+```
+
+The HTML report is a self-contained scorecard with the results table, stage coverage matrix, skill audit, findings, and recommendation. Always generate it as the final step of the benchmark.
+
 ## Output format
 
 ```text
@@ -152,6 +161,14 @@ Write `benchmark-report.json` to `--out-dir` (default: `./reports/e2e-benchmark`
 
 `benchmark-e2e` is a meta-skill; set `decision` to `GO` when benchmark completes normally. Populate `results` with one entry per mode and `recommendation` with the ranked conclusions.
 
+Then immediately generate the HTML report:
+
+```bash
+uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir>
+```
+
+Both `benchmark-report.json` and `benchmark-report.html` must be present for the benchmark to be considered complete.
+
 ## Additional resources
 
 - [references/harnesses.md](references/harnesses.md) — agent harnesses and models (Claude Code, Codex, Gemini CLI)
@@ -160,3 +177,4 @@ Write `benchmark-report.json` to `--out-dir` (default: `./reports/e2e-benchmark`
 - [references/datasets.md](references/datasets.md) — benchmark dataset catalog and loading snippets
 - [references/skill-matrix.md](references/skill-matrix.md) — required skills by mode/scenario
 - [scripts/init-report.sh](scripts/init-report.sh) — benchmark report scaffold
+- [scripts/generate_benchmark_report.py](scripts/generate_benchmark_report.py) — generate self-contained HTML scorecard from `benchmark-report.json`

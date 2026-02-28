@@ -32,6 +32,7 @@ All artifacts share these top-level fields:
 ```
 
 **Rules:**
+
 - `run_id`: set by `orchestrate-e2e` and passed to sub-skills via `--run-id`; standalone invocations generate a local UUID
 - `decision`: required for all skills; use `GO` when no gate decision applies (e.g., babysit-training completing successfully)
 - `findings`: empty array `[]` when there are no findings — never omit the field

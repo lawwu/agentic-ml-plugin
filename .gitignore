@@ -3,7 +3,9 @@ TODO.md
 
 # Reports and run outputs
 reports/
+codex-output/
 demo/scenarios/**/*.md
+demo/scenarios/**/*.csv
 
 # Secrets
 .env

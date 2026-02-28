@@ -24,6 +24,7 @@ claude -p "Run check-dataset-quality on data/train.csv --label-col label" \
 ```
 
 **Notes**:
+
 - Skills in this repo are available when `--plugin-dir` points to `plugins/ml-skills`
 - Token usage is reported in session output and API response metadata
 - Use `--output-format json` to capture structured output for telemetry
@@ -47,6 +48,7 @@ codex --approval-policy auto "..."
 ```
 
 **Notes**:
+
 - Skills in this repo are not natively available; the no-plugin mode is the natural fit
 - Token usage available via OpenAI API usage metadata
 - `--approval-policy auto` enables non-interactive execution
@@ -67,6 +69,7 @@ gemini "Run an end-to-end ML pipeline on data/train.csv targeting the label colu
 ```
 
 **Notes**:
+
 - Skills in this repo are not natively available; no-plugin mode applies
 - Requires `GEMINI_API_KEY` or gcloud ADC
 - Token usage available via `--show-usage` flag or API response metadata

@@ -30,21 +30,25 @@ Grad overflow on iteration 442, skipping update
 ### Framework-specific configs to check
 
 **HF Trainer (`TrainingArguments`)**:
+
 - `fp16=True` + no `fp16_opt_level` → default "O1" which can overflow; try `bf16=True`
 - `max_grad_norm=None` → no clipping; set `max_grad_norm=1.0`
 - `dataloader_num_workers=0` → ensures bad batch reproducibility for debugging
 
 **Lightning**:
+
 - `precision="16-mixed"` → try `"bf16-mixed"`
 - `gradient_clip_val=None` → set to `1.0`
 - Check `on_before_optimizer_step` hook for custom grad manipulation
 
 **DeepSpeed**:
+
 - `"fp16": {"enabled": true, "loss_scale": 0}` → dynamic loss scaling; if `loss_scale_window` is too small, scaling collapses too fast
 - `"bf16": {"enabled": true}` → more stable; try switching
 - `"gradient_clipping": 1.0` must be set in DeepSpeed config, not Trainer args
 
 **FSDP**:
+
 - Mixed precision policy: `param_dtype=torch.float16` can overflow; use `bfloat16`
 - Ensure `mixed_precision.reduce_dtype` matches `param_dtype`
 
@@ -80,20 +84,24 @@ RuntimeError: CUDA out of memory. Tried to allocate ...
 ### Framework-specific configs to check
 
 **HF Trainer**:
+
 - `per_device_eval_batch_size` — defaults to `per_device_train_batch_size`; set separately
 - `gradient_checkpointing=True` — enables activation checkpointing
 - `dataloader_pin_memory=True` with large batches can exacerbate host OOM
 
 **Lightning**:
+
 - `accumulate_grad_batches` — check if effective batch is larger than expected
 - Enable: `trainer = Trainer(enable_progress_bar=True, precision="16-mixed")`
 
 **DeepSpeed**:
+
 - `"zero_optimization": {"stage": 3}` — most memory-efficient; try upgrading from stage 1/2
 - `"offload_optimizer": {"device": "cpu"}` — offload optimizer states to CPU RAM
 - `"offload_param": {"device": "cpu"}` — offload model params (slowest but most memory savings)
 
 **FSDP**:
+
 - `ShardingStrategy.FULL_SHARD` — most memory efficient
 - `cpu_offload=CPUOffload(offload_params=True)` — CPU offload
 
@@ -268,11 +276,13 @@ RuntimeError: PytorchStreamReader failed reading zip archive: failed finding cen
 ### Framework-specific configs to check
 
 **HF Trainer**:
+
 - `lr_scheduler_type` — default is `linear`; check if cosine or polynomial was intended
 - `warmup_steps` vs `warmup_ratio` — only one should be set
 - `learning_rate` — verify it matches the paper/baseline (common typo: `3e-4` vs `3e-5`)
 
 **Lightning**:
+
 - `configure_optimizers()` return value — must return `(optimizers, schedulers)` correctly
 - `scheduler.step()` frequency — `interval: "step"` vs `interval: "epoch"`
 

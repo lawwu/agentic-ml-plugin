@@ -115,6 +115,7 @@ Decision: GO | NO-GO (missing: <what>)
 Write `plan-experiment.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate from the plan output:
+
 - `decision`: `GO` when plan is complete and ready; `NO-GO` when blocking input is missing
 - `hypothesis`, `candidates`, `success_criteria`, `experiment_order`
 - `findings`: one entry per blocker or gap (severity `blocker` for missing metric/dataset, `medium` for warnings)

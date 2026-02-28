@@ -114,6 +114,7 @@ Write artifacts listed in [references/artifact-contract.md](references/artifact-
 - recommended next commands
 
 After all gates complete:
+
 1. Write `run-summary.json` to `--out-dir` (schema in [../../references/schemas.md](../../references/schemas.md))
 2. Generate the HTML report: `uv run plugins/agentic-ml/report-viewer/generate_report.py <out-dir>`
 3. Report the `report.html` path in final output

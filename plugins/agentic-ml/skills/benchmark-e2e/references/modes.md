@@ -70,6 +70,7 @@ Map AutoGluon's outputs to each of the 8 stages:
 - Stage 8: produce deployment-readiness recommendation from AutoGluon artifacts
 
 Execution requirements:
+
 - install dependencies with `uv pip install autogluon`
 - run scripts with `uv run ...`
 

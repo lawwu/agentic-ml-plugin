@@ -1,0 +1,28 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: mixed-line-ending
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-json
+      - id: pretty-format-json
+        args: [--autofix, --no-sort-keys]
+      - id: detect-private-key
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.yaml]
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+      - id: python-no-eval
+      - id: text-unicode-replacement-char

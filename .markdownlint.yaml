@@ -1,0 +1,29 @@
+default: true
+
+# Allow long lines (common in tables and code blocks)
+MD013: false
+
+# Allow duplicate headings in different sections
+MD024:
+  siblings_only: true
+
+# Allow raw HTML (used in some READMEs)
+MD033: false
+
+# Allow first line to not be a top-level heading
+MD041: false
+
+# Table column style — too noisy for existing tables
+MD060: false
+
+# Code fences without language — common in log/text blocks
+MD040: false
+
+# Emphasis used as heading — intentional style in SKILL.md files
+MD036: false
+
+# Table column count — existing tables have intentional pipe formatting
+MD056: false
+
+# Blank line inside blockquote — used for readability
+MD028: false

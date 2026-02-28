@@ -21,6 +21,7 @@ Arguments ($ARGUMENTS) are interpreted as:
 - **Wandb/MLflow run**: `--wandb run-id` or `--mlflow run-id`
 
 Optional flags:
+
 - `--project PROJECT` — GCP project ID (required for Vertex AI targets; falls back to `gcloud config get-value project`)
 - `--region REGION` — GCP region (default: `us-central1`)
 - `--interval N` — poll every N seconds (default: 30; default 60 for Vertex AI)
@@ -46,6 +47,7 @@ Determine whether the target is local, remote, or cloud, and what monitoring str
 ### 2. Establish a baseline
 
 On first poll:
+
 - Confirm the process is running and the log is readable
 - Extract the current epoch/step/iteration number
 - Note the current loss and any other reported metrics (accuracy, perplexity, grad norm, lr, etc.)
@@ -105,16 +107,19 @@ For Vertex AI-specific monitoring, see [references/vertex-ai.md](references/vert
 ### 5. Fix policy
 
 Apply fixes only when:
+
 - The fix is clearly safe and reversible
 - `--no-fix` flag is NOT set
 - You have not already retried this type of fix 3 times
 
 Safe fixes you may attempt:
+
 - Restart a crashed process (if restart command is determinable from the log header or working directory)
 - Clear CUDA cache (`torch.cuda.empty_cache()` via a helper script if accessible)
 - Kill and restart a zombie process
 
 Fixes that require user approval:
+
 - Changing hyperparameters (learning rate, batch size)
 - Rolling back to a checkpoint
 - Canceling the run
@@ -124,6 +129,7 @@ Always state what you are about to do before doing it.
 ### 6. Progress reporting format
 
 **Local/remote training:**
+
 ```
 [HH:MM:SS] Step 1200/10000 (12%) | loss=0.342 | lr=1e-4 | grad_norm=0.8 | 142 samples/s
   GPU: 94% util, 18.2/24 GB VRAM | ETA: ~1h 23m
@@ -132,6 +138,7 @@ Always state what you are about to do before doing it.
 If remote SSH, prefix with `[user@host]`.
 
 **Vertex AI Pipeline job:**
+
 ```
 [HH:MM:SS] Pipeline: my-training-pipeline (projects/my-proj/locations/us-central1/pipelineJobs/123)
   State: RUNNING | Elapsed: 1h 23m
@@ -140,6 +147,7 @@ If remote SSH, prefix with `[user@host]`.
 ```
 
 **Vertex AI Custom training job:**
+
 ```
 [HH:MM:SS] Custom job: my-gpt2-finetune (projects/my-proj/locations/us-central1/customJobs/456)
   State: RUNNING | Elapsed: 2h 10m | Worker: n1-standard-8 + 4x T4
@@ -183,6 +191,7 @@ Confidence: high|medium|low
 Write `babysit-training.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` when training succeeded; `NO-GO` when terminal state is a failure
 - `terminal_state`, `total_steps`, `final_metrics`, `best_checkpoint`
 - `anomalies_detected`: one entry per anomaly observed during monitoring
@@ -191,6 +200,7 @@ Key fields to populate:
 ## Example sessions
 
 **Local/remote training:**
+
 ```
 /ml-skills:babysit-training user@gpu-box:~/runs/gpt2-finetune/train.log --interval 60
 
@@ -205,6 +215,7 @@ Key fields to populate:
 ```
 
 **Vertex AI Pipeline:**
+
 ```
 /ml-skills:babysit-training --vertex-pipeline my-llm-pipeline --project my-gcp-proj --interval 120
 
@@ -222,6 +233,7 @@ Key fields to populate:
 ```
 
 **Vertex AI Custom training job:**
+
 ```
 /ml-skills:babysit-training --vertex-training 9876543210 --project my-gcp-proj
 

@@ -114,6 +114,7 @@ Confidence: high|medium|low
 Write `review-target.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
+
 - `decision`: `GO` / `NO-GO`
 - `prediction_contract`: entity, prediction_time, target_event, horizon
 - `leakage_risks`: one entry per risk found

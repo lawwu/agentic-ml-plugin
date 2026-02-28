@@ -350,7 +350,7 @@ Written to: `<out-dir>/run-summary.json`
   "summary": "<one-line summary>",
   "findings": [],
   "next_commands": [],
-  "selected_scenario": "clean-kaggle | messy-data",
+  "selected_scenario": "hard-fraud | hard-attrition | xhard-churn",
   "scenario_detection": "auto | user-forced",
   "modes": ["no-plugin", "plugin", "automl"],
   "runs_per_cell": 1,

@@ -1,6 +1,6 @@
 # Skill Matrix
 
-Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages. The skill chain is identical for both `hard-fraud` and `hard-attrition`.
+Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages. The skill chain is identical for `hard-fraud`, `hard-attrition`, and `xhard-churn`.
 
 ## plugin mode
 

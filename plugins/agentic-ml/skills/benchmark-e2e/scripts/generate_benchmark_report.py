@@ -60,15 +60,50 @@ STAGE_LABELS = [
     "8. Promotion decision",
 ]
 
-PITFALL_KEYS = [
+PITFALL_KEYS_BY_SCENARIO = {
+    "hard-fraud": [
+        ("target_echo", "Target echo"),
+        ("near_perfect_leak", "Near-perfect leak"),
+        ("wrong_metric", "Wrong metric (AUC vs AUPRC)"),
+        ("selection_bias", "Selection bias"),
+        ("geographic_proxy", "Geographic proxy bias"),
+        ("split_boundary", "Split boundary / concept drift"),
+        ("feedback_loop", "Feedback loop"),
+    ],
+    "hard-attrition": [
+        ("target_echo", "Target echo"),
+        ("label_ambiguity", "Label ambiguity"),
+        ("survivorship_bias", "Survivorship bias"),
+        ("endogenous_feature", "Endogenous feature"),
+        ("protected_proxy", "Protected attribute proxy"),
+        ("high_cardinality_proxy", "High-cardinality proxy"),
+        ("disparate_impact", "Disparate impact (gender/ethnicity)"),
+    ],
+    "xhard-churn": [
+        ("composite_leak", "Composite leak (tickets × login)"),
+        ("entity_temporal_leak", "Entity-level temporal leakage"),
+        ("survivorship_bias", "Survivorship bias"),
+        ("label_drift", "Label definition drift (Q4+)"),
+        ("future_peeking", "Future-peeking feature"),
+        ("simpsons_paradox", "Simpson's paradox (discount_pct)"),
+        ("protected_proxy", "Protected proxy (region → size)"),
+        ("feature_staleness", "Feature staleness (nps_score)"),
+    ],
+}
+
+# Default fallback pitfall keys (union of common ones)
+PITFALL_KEYS_DEFAULT = [
     ("target_echo", "Target echo"),
     ("near_perfect_leak", "Near-perfect leak"),
-    ("wrong_metric", "Wrong metric (AUC vs AUPRC)"),
+    ("wrong_metric", "Wrong metric"),
     ("selection_bias", "Selection bias"),
-    ("geographic_proxy", "Geographic proxy bias"),
-    ("split_boundary", "Split boundary tie"),
+    ("split_boundary", "Split boundary"),
     ("feedback_loop", "Feedback loop"),
 ]
+
+
+def get_pitfall_keys(scenario: str) -> list:
+    return PITFALL_KEYS_BY_SCENARIO.get(scenario, PITFALL_KEYS_DEFAULT)
 
 # ── HTML template ─────────────────────────────────────────────────────────────
 

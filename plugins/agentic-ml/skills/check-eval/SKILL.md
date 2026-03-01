@@ -66,6 +66,7 @@ After evaluation completes:
 
 - Extract metric names and values from the output JSON or stdout
 - Compute deltas vs. baseline if `--baseline` is provided (use [scripts/compare-results.sh](scripts/compare-results.sh))
+  - When `--baseline` points to a `build-baseline.json` artifact, extract `best_score` as the comparison floor; the non-ML baseline score is the minimum bar the ML model must exceed
 - Flag any metrics that regressed vs. baseline
 - Report per-task and aggregate results
 
@@ -87,6 +88,7 @@ Results:
 
 Summary:
 - Best gain: <metric> +Δ
+- Improvement over non-ML baseline: +X.X pp (when build-baseline.json is the --baseline)
 - Regressions: <metric> -Δ (investigate)
 - New metrics (no baseline): <list>
 

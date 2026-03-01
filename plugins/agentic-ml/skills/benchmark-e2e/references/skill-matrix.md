@@ -1,33 +1,34 @@
 # Skill Matrix
 
-Required skill usage per benchmark cell. All modes must attempt all 8 lifecycle stages. The skill chain is identical for `hard-fraud`, `hard-attrition`, and `xhard-churn`.
+Required skill usage per benchmark cell. All modes must attempt all 9 lifecycle stages. The skill chain is identical for `hard-fraud`, `hard-attrition`, and `xhard-churn`.
 
 ## plugin mode
 
-Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a wrapper — invoke sub-skills directly so the benchmark always covers all 8 stages regardless of individual gate decisions.
+Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a wrapper — invoke sub-skills directly so the benchmark always covers all 9 stages regardless of individual gate decisions.
 
 | Stage | Skill |
 |---|---|
 | 1. Target readiness | `review-target` |
 | 2. Experiment plan | `plan-experiment` |
-| 3. Dataset quality | `check-dataset-quality` |
-| 4. Data pipeline | `check-data-pipeline` |
-| 5. Training stability | `babysit-training` (+ `check-failed-run` if training fails) |
-| 6. Evaluation quality | `check-eval` |
-| 7. Interpretability/bias | `explain-model` |
-| 8. Promotion decision | record final GO/NO-GO from stage results |
+| 3. Non-ML baseline | `build-baseline` |
+| 4. Dataset quality | `check-dataset-quality` |
+| 5. Data pipeline | `check-data-pipeline` |
+| 6. Training stability | `babysit-training` (+ `check-failed-run` if training fails) |
+| 7. Evaluation quality | `check-eval` |
+| 8. Interpretability/bias | `explain-model` |
+| 9. Promotion decision | record final GO/NO-GO from stage results |
 
 Any stage that is skipped (e.g., no checkpoint produced) must be recorded as `SKIPPED` with reason.
 
 ## no-plugin mode
 
 - Expected skills: none (zero skill invocations; any skill call is an audit violation)
-- Execute all 8 stages manually
+- Execute all 9 stages manually
 
 ## automl mode
 
 - Expected skills: none (zero skill invocations; AutoGluon package only)
-- Map AutoGluon outputs to all 8 stages per [modes.md](modes.md)
+- Map AutoGluon outputs to all 9 stages per [modes.md](modes.md)
 
 ## Audit violations
 

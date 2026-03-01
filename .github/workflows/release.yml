@@ -1,11 +1,12 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'plugins/agentic-ml/.claude-plugin/plugin.json'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -35,19 +36,22 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Abort if tag already exists
+        if: steps.tag_check.outputs.exists == 'true'
+        run: |
+          echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Bump the version in plugin.json before releasing."
+          exit 1
+
       - name: Find previous release tag
-        if: steps.tag_check.outputs.exists == 'false'
         id: prev_tag
         run: |
           PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
           echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
-        if: steps.tag_check.outputs.exists == 'false'
         id: notes
         env:
           PREV_TAG: ${{ steps.prev_tag.outputs.tag }}
-          CURR_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           # Commit range: from last tag (or root) to HEAD
@@ -62,20 +66,13 @@ jobs:
 
           # Buckets
           SKILLS="" DOCS="" FIXES="" CHORES="" OTHER=""
-          declare -A AUTHORS
 
           while IFS= read -r line; do
             HASH=$(echo "$line" | cut -d' ' -f1)
             SUBJECT=$(echo "$line" | cut -d' ' -f2-)
 
-            # Author
-            AUTHOR=$(git log -1 --pretty=format:"%an" "$HASH")
-            AUTHOR_LOGIN=$(git log -1 --pretty=format:"%ae" "$HASH")
-            AUTHORS["$AUTHOR"]=1
-
-            # Short hash link
+            # Short hash entry
             SHORT="${HASH:0:7}"
-            REPO="${{ github.repository }}"
             ENTRY="- ${SUBJECT} (\`${SHORT}\`)"
 
             # Categorise by conventional-commit prefix or keywords
@@ -86,7 +83,7 @@ jobs:
                 FIXES="${FIXES}"$'\n'"${ENTRY}" ;;
               doc*|Doc*|readme*|README*)
                 DOCS="${DOCS}"$'\n'"${ENTRY}" ;;
-              chore*|Chore*|refactor*|Refactor*|ci*|CI*|build*|Build*|bump*|Bump*)
+              chore*|Chore*|refactor*|Refactor*|ci*|CI*|build*|Build*|bump*|Bump*|remove*|Remove*)
                 CHORES="${CHORES}"$'\n'"${ENTRY}" ;;
               *)
                 OTHER="${OTHER}"$'\n'"${ENTRY}" ;;
@@ -96,7 +93,7 @@ jobs:
           # All contributors in this range
           CONTRIBUTORS=$(git log "$RANGE" --pretty=format:"%an" | sort -u | sed 's/^/- /')
 
-          # New contributors: authors who have no commits before PREV_TAG
+          # New contributors: authors with no commits before PREV_TAG
           NEW_CONTRIBUTORS=""
           while IFS= read -r name; do
             if [ -n "$PREV_TAG" ]; then
@@ -161,19 +158,16 @@ jobs:
             fi
           } > /tmp/release_notes.md
 
-          # Export as multiline output
-          {
-            echo "body<<RELEASE_BODY_EOF"
-            cat /tmp/release_notes.md
-            echo "RELEASE_BODY_EOF"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Create tag and GitHub release
-        if: steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          PRERELEASE_FLAG=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "agentic-ml ${{ steps.version.outputs.tag }}" \
             --notes-file /tmp/release_notes.md \
-            --target "${{ github.sha }}"
+            --target "${{ github.sha }}" \
+            $PRERELEASE_FLAG

@@ -1,6 +1,6 @@
 # Agentic ML Plugin
 
-Agent skills for machine learning workflows for Claude Code and other agenic coding harnesses.
+Agent skills for machine learning workflows for Claude Code and other agentic coding harnesses.
 
 ## Installation
 

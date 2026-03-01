@@ -35,22 +35,3 @@ Shared enums used in all skill JSON artifacts. Use these exact strings — do no
 | `high` | Strong evidence; low ambiguity |
 | `medium` | Adequate evidence; some uncertainty |
 | `low` | Sparse evidence; interpret with caution |
-
-## Legacy Term Mapping
-
-When updating existing text output, normalize these terms to the canonical vocabulary:
-
-| Skill | Legacy term | Canonical |
-|---|---|---|
-| plan-experiment | `BLOCKED` | `NO-GO` |
-| plan-experiment | `GO (plan ready)` | `GO` |
-| explain-model | `PROMOTE` | `GO` |
-| explain-model | `PROMOTE-WITH-CAVEATS` | `CONDITIONAL` |
-| explain-model | `DO-NOT-PROMOTE` | `NO-GO` |
-| check-dataset-quality | `Go/No-Go: GO` | `GO` |
-| check-dataset-quality | `Go/No-Go: NO-GO` | `NO-GO` |
-| feature-engineer | _(no explicit decision)_ | add `GO / NO-GO / CONDITIONAL` |
-| check-data-pipeline | _(implied pass/fail)_ | add explicit `GO / NO-GO` |
-| babysit-training | _(no formal decision)_ | add `GO / NO-GO` based on terminal status |
-| check-failed-run | _(status only)_ | add `GO / NO-GO` (GO = recoverable path identified) |
-| check-eval | _(no explicit gate)_ | add `GO / NO-GO / CONDITIONAL` |

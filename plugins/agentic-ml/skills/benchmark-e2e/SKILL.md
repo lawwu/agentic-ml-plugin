@@ -49,7 +49,7 @@ Document any assumptions.
 
 ### 3. Apply mode-specific flow
 
-Use [references/modes.md](references/modes.md) to run each mode consistently. All modes must attempt all 8 lifecycle stages in order. A NO-GO at any stage is recorded but does not halt the benchmark — continue to the next stage so every cell has full coverage.
+Use [references/modes.md](references/modes.md) to run each mode consistently. All modes must attempt all 9 lifecycle stages in order. A NO-GO at any stage is recorded but does not halt the benchmark — continue to the next stage so every cell has full coverage.
 
 For each stage, record:
 
@@ -132,12 +132,13 @@ Stage coverage:
 |---|---|---|---|
 | 1. Target readiness | GO/NO-GO/SKIPPED | GO/NO-GO/SKIPPED | GO/NO-GO/SKIPPED |
 | 2. Experiment plan | ... | ... | ... |
-| 3. Dataset quality | ... | ... | ... |
-| 4. Data pipeline | ... | ... | ... |
-| 5. Training stability | ... | ... | ... |
-| 6. Evaluation quality | ... | ... | ... |
-| 7. Interpretability/bias | ... | ... | ... |
-| 8. Promotion decision | GO/NO-GO | GO/NO-GO | GO/NO-GO |
+| 3. Non-ML baseline | ... | ... | ... |
+| 4. Dataset quality | ... | ... | ... |
+| 5. Data pipeline | ... | ... | ... |
+| 6. Training stability | ... | ... | ... |
+| 7. Evaluation quality | ... | ... | ... |
+| 8. Interpretability/bias | ... | ... | ... |
+| 9. Promotion decision | GO/NO-GO | GO/NO-GO | GO/NO-GO |
 
 Skill usage audit:
 - Expected vs actual skills per cell

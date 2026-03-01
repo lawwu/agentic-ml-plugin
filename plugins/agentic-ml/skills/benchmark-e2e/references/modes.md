@@ -4,18 +4,19 @@ Use consistent execution definitions so benchmark cells are comparable.
 
 ## Shared lifecycle framework
 
-Every mode must attempt the same 8 lifecycle stages in order, regardless of mode. This is what makes cells comparable. Record each stage's outcome — do not skip stages for any reason other than an upstream hard dependency (e.g., skip stage 5 if no training run was produced by stage 2/3/4).
+Every mode must attempt the same 9 lifecycle stages in order, regardless of mode. This is what makes cells comparable. Record each stage's outcome — do not skip stages for any reason other than an upstream hard dependency (e.g., skip stage 6 if no training run was produced by stage 2/3/4/5).
 
 | Stage | Lifecycle gate | `no-plugin` activity | `plugin` activity | `automl` activity |
 |---|---|---|---|---|
 | 1 | Target readiness | Manual target framing and metric definition | `review-target` | Define target/task in code |
 | 2 | Experiment plan | Manual model selection and HP search plan | `plan-experiment` | AutoGluon hyperparameter space (automatic) |
-| 3 | Dataset quality | Manual dataset checks and EDA | `check-dataset-quality` | Manual schema/label inspection |
-| 4 | Data pipeline | Manual preprocessing sanity checks | `check-data-pipeline` | AutoGluon pipeline dry-run |
-| 5 | Training stability | Manual training run and log monitoring | `babysit-training` (+ `check-failed-run` on failure) | AutoGluon `fit()` with runtime logging |
-| 6 | Evaluation quality | Manual metric computation and baseline comparison | `check-eval` | AutoGluon leaderboard + holdout metrics |
-| 7 | Interpretability/bias | Manual feature importance and bias review | `explain-model` | AutoGluon feature importance + bias check |
-| 8 | Promotion decision | Manual summary decision | Final `GO`/`NO-GO` from `orchestrate-e2e` | Deployment-readiness recommendation |
+| 3 | Non-ML baseline | Manual heuristic baseline | `build-baseline` | Manual heuristic baseline |
+| 4 | Dataset quality | Manual dataset checks and EDA | `check-dataset-quality` | Manual schema/label inspection |
+| 5 | Data pipeline | Manual preprocessing sanity checks | `check-data-pipeline` | AutoGluon pipeline dry-run |
+| 6 | Training stability | Manual training run and log monitoring | `babysit-training` (+ `check-failed-run` on failure) | AutoGluon `fit()` with runtime logging |
+| 7 | Evaluation quality | Manual metric computation and baseline comparison | `check-eval` | AutoGluon leaderboard + holdout metrics |
+| 8 | Interpretability/bias | Manual feature importance and bias review | `explain-model` | AutoGluon feature importance + bias check |
+| 9 | Promotion decision | Manual summary decision | Final `GO`/`NO-GO` from `orchestrate-e2e` | Deployment-readiness recommendation |
 
 **A NO-GO at any stage does not halt the benchmark.** Record the NO-GO decision and continue measuring remaining stages. The benchmark needs full coverage to score reliability; stopping early would make scores incomparable across modes.
 
@@ -49,7 +50,7 @@ If unavailable, record `unknown` and explain why in the run notes.
 
 Manual/scripted flow without plugin command shortcuts. Do not invoke any skills in this mode.
 
-Execute each of the 8 stages manually. Document decisions, code written, and checks performed for each stage. Record a GO/NO-GO decision per stage based on findings — but always proceed to the next stage regardless of the decision (benchmark does not halt on NO-GO).
+Execute each of the 9 stages manually. Document decisions, code written, and checks performed for each stage. Record a GO/NO-GO decision per stage based on findings — but always proceed to the next stage regardless of the decision (benchmark does not halt on NO-GO).
 
 ## plugin
 
@@ -61,9 +62,9 @@ After each skill completes, record its decision and proceed to the next stage re
 
 AutoML path implemented with AutoGluon. Do not invoke any skills in this mode.
 
-Map AutoGluon's outputs to each of the 8 stages:
+Map AutoGluon's outputs to each of the 9 stages:
 
-- Stages 1–4: perform manually before calling `fit()`; document what was checked
+- Stages 1–5: perform manually before calling `fit()`; document what was checked
 - Stage 5: `TabularPredictor.fit()` (or `MultiModalPredictor` as applicable); capture fit summary and training logs
 - Stage 6: extract AutoGluon leaderboard + holdout metrics; compare against baseline
 - Stage 7: `predictor.feature_importance()` + manual bias check on protected attributes

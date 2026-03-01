@@ -37,12 +37,25 @@ git clone git@github.com:lawwu/agentic-ml-plugin.git ~/agentic-ml-plugin
 claude --plugin-dir ~/agentic-ml-plugin/plugins/agentic-ml
 ```
 
+## Sample Prompts
+
+Run complete ML lifecycle:
+
+```bash
+/orchestrate-e2e on the medium dataset in demo/
+```
+
+```bash
+/orchestrate-e2e on the medium dataset in demo/ but use the mlscribe cli to show me some artifacts. see https://github.com/lawwu/mlscribe
+```
+
 ## Available Skills
 
 | Skill | Lifecycle stage | Description |
 |-------|----------------|-------------|
 | [review-target](plugins/agentic-ml/skills/review-target/SKILL.md) | Problem framing | Validate label/target definition, leakage risk, metric alignment, and split strategy before modeling |
 | [plan-experiment](plugins/agentic-ml/skills/plan-experiment/SKILL.md) | Pre-training | Design a structured experiment plan with hypothesis, model candidates, HP search space, compute budget, and ordered execution |
+| [build-baseline](plugins/agentic-ml/skills/build-baseline/SKILL.md) | Pre-training | Build and evaluate non-ML baselines (majority class, mean predictor, simple rules) to establish the performance floor ML must beat |
 | [check-dataset-quality](plugins/agentic-ml/skills/check-dataset-quality/SKILL.md) | Pre-training | Profile and validate CSV, Parquet, JSONL, HuggingFace datasets, database tables, or image directories |
 | [check-data-pipeline](plugins/agentic-ml/skills/check-data-pipeline/SKILL.md) | Pre-training | Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, padding, and label encoding issues |
 | [feature-engineer](plugins/agentic-ml/skills/feature-engineer/SKILL.md) | Pre-training | Explore files or database tables and design leakage-safe feature sets tied to label and business outcome |
@@ -91,12 +104,13 @@ The report includes a gate timeline, per-skill collapsible cards with findings t
   |------------------------|------------|--------------|--------------|
   | 1. Target readiness    | NO-GO      | NO-GO        | NO-GO        |
   | 2. Experiment plan     | GO         | GO           | GO           |
-  | 3. Dataset quality     | CONDITIONAL| NO-GO        | CONDITIONAL  |
-  | 4. Data pipeline       | CONDITIONAL| CONDITIONAL  | CONDITIONAL  |
-  | 5. Training stability  | GO         | GO           | GO           |
-  | 6. Evaluation quality  | NO-GO      | CONDITIONAL  | NO-GO        |
-  | 7. Interpretability    | NO-GO      | NO-GO        | NO-GO        |
-  | 8. Promotion decision  | GO         | NO-GO        | GO           |
+  | 3. Non-ML baseline     | GO         | GO           | GO           |
+  | 4. Dataset quality     | CONDITIONAL| NO-GO        | CONDITIONAL  |
+  | 5. Data pipeline       | CONDITIONAL| CONDITIONAL  | CONDITIONAL  |
+  | 6. Training stability  | GO         | GO           | GO           |
+  | 7. Evaluation quality  | NO-GO      | CONDITIONAL  | NO-GO        |
+  | 8. Interpretability    | NO-GO      | NO-GO        | NO-GO        |
+  | 9. Promotion decision  | GO         | NO-GO        | GO           |
 
   Pitfall detection (hard-fraud):
   | Pitfall                           | no-plugin | plugin | automl |
@@ -110,7 +124,7 @@ The report includes a gate timeline, per-skill collapsible cards with findings t
 
   Skill usage audit:
   - no-plugin: 0 skills (PASS — expected 0)
-  - plugin: review-target, plan-experiment, check-dataset-quality, check-data-pipeline,
+  - plugin: review-target, plan-experiment, build-baseline, check-dataset-quality, check-data-pipeline,
             check-eval, explain-model (babysit-training invoked inline — skill unavailable via tool)
   - automl: 0 skills (PASS — expected 0)
 
@@ -128,12 +142,13 @@ The report includes a gate timeline, per-skill collapsible cards with findings t
     ├── benchmark-report.json
     ├── plugin/stage1/review-target.json
     ├── plugin/stage2/plan-experiment.json
-    ├── plugin/stage3/check-dataset-quality.json
-    ├── plugin/stage4/check-data-pipeline.json
-    ├── plugin/stage5/babysit-training.json
-    ├── plugin/stage6/check-eval.json
-    ├── plugin/stage7/explain-model.json + MODEL_CARD.md + feature_importance.json
-    ├── plugin/stage8-promotion.md
+    ├── plugin/stage3/build-baseline.json
+    ├── plugin/stage4/check-dataset-quality.json
+    ├── plugin/stage5/check-data-pipeline.json
+    ├── plugin/stage6/babysit-training.json
+    ├── plugin/stage7/check-eval.json
+    ├── plugin/stage8/explain-model.json + MODEL_CARD.md + feature_importance.json
+    ├── plugin/stage9-promotion.md
     └── automl/automl-stage-summary.json + ag_model/
 ```
 

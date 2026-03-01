@@ -46,12 +46,13 @@ Use [references/lifecycle-gates.md](references/lifecycle-gates.md) and define pa
 
 1) target readiness
 2) experiment plan
-3) dataset quality
-4) data pipeline integrity
-5) training stability
-6) evaluation quality
-7) interpretability and bias
-8) promotion decision
+3) non-ML baseline
+4) dataset quality
+5) data pipeline integrity
+6) training stability
+7) evaluation quality
+8) interpretability and bias
+9) promotion decision
 
 Never skip gates without explicitly recording why.
 
@@ -65,12 +66,13 @@ Run and record:
 
 - `review-target` — gate 1
 - `plan-experiment` — gate 2
-- `check-dataset-quality` — gate 3
-- `check-data-pipeline` — gate 4
+- `build-baseline` — gate 3
+- `check-dataset-quality` — gate 4
+- `check-data-pipeline` — gate 5
 
 Apply the NO-GO halt policy after each gate.
 
-### 4. Execute training gate (gate 5)
+### 4. Execute training gate (gate 6)
 
 When `--train-cmd` is provided:
 
@@ -81,16 +83,16 @@ When `--train-cmd` is provided:
 
 When `--train-cmd` is missing, request it and wait.
 
-### 5. Execute evaluation gate (gate 6)
+### 5. Execute evaluation gate (gate 7)
 
 Run `check-eval` on the selected checkpoint/model:
 
-- Compare against baseline when provided
+- Compare against baseline when provided; if `build-baseline.json` exists in `--out-dir`, pass it as `--baseline` automatically so the non-ML baseline score is the comparison floor
 - Record regressions and improvements
 - Produce a clear pass/fail against metric thresholds
 - Apply the NO-GO halt policy after `check-eval` completes
 
-### 5b. Execute interpretability gate (gate 7)
+### 5b. Execute interpretability gate (gate 8)
 
 Run `explain-model` on the promoted checkpoint:
 
@@ -139,12 +141,13 @@ Primary metric: <...>
 Gate Status:
 1) Target readiness:       PASS|FAIL|SKIPPED
 2) Experiment plan:        PASS|FAIL|SKIPPED
-3) Dataset quality:        PASS|FAIL|SKIPPED
-4) Data pipeline:          PASS|FAIL|SKIPPED
-5) Training stability:     PASS|FAIL|SKIPPED
-6) Evaluation quality:     PASS|FAIL|SKIPPED
-7) Interpretability/bias:  PASS|FAIL|SKIPPED
-8) Promotion decision:     GO|NO-GO
+3) Non-ML baseline:        PASS|FAIL|SKIPPED
+4) Dataset quality:        PASS|FAIL|SKIPPED
+5) Data pipeline:          PASS|FAIL|SKIPPED
+6) Training stability:     PASS|FAIL|SKIPPED
+7) Evaluation quality:     PASS|FAIL|SKIPPED
+8) Interpretability/bias:  PASS|FAIL|SKIPPED
+9) Promotion decision:     GO|NO-GO
 
 Decision: GO|NO-GO
 Confidence: high|medium|low
@@ -166,6 +169,7 @@ Next commands:
 - Training diverges in first 100 steps → do not burn budget retrying; pause and diagnose with `check-failed-run`
 - Eval metric matches training metric suspiciously closely → re-check dataset gate for cross-split leakage
 - Promotion threshold not set → default to "statistically significant improvement over baseline"; warn user and document assumption
+- Baseline outperforms ML model → re-examine whether ML is needed (Rule 1 of Google's Rules of ML); surface as `high` finding
 - Budget exceeded before eval → prefer a partial evaluation over none; document truncation in the run artifact
 
 ## Stop conditions
@@ -173,7 +177,7 @@ Next commands:
 Stop when any of these is true:
 
 - a gate returns `NO-GO` — halt immediately, write partial artifacts, generate partial HTML report
-- all 8 gates complete and the final promotion decision is delivered
+- all 9 gates complete and the final promotion decision is delivered
 - user input is required for an explicit policy decision (for example, changing threshold or budget)
 
 ## Additional resources

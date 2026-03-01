@@ -100,6 +100,31 @@ Written to: `<out-dir>/plan-experiment.json`
 
 ---
 
+### `build-baseline`
+
+Written to: `<out-dir>/build-baseline.json`
+
+```json
+{
+  "task_type": "classification | regression | ranking | forecasting",
+  "data_source": "<path or dataset>",
+  "label_col": "<col>",
+  "primary_metric": "<metric>",
+  "baselines": [
+    {
+      "method": "<name>",
+      "description": "<what it does>",
+      "score": 0.5,
+      "is_best": true
+    }
+  ],
+  "best_baseline": "<method name>",
+  "best_score": 0.5
+}
+```
+
+---
+
 ### `check-dataset-quality`
 
 Written to: `<out-dir>/check-dataset-quality.json`
@@ -319,7 +344,7 @@ Written to: `<out-dir>/run-summary.json`
   "gates": [
     {
       "gate_number": 1,
-      "gate_name": "review-target | check-dataset-quality | check-data-pipeline | feature-engineer | babysit-training | check-failed-run | check-eval | explain-model",
+      "gate_name": "review-target | plan-experiment | build-baseline | check-dataset-quality | check-data-pipeline | feature-engineer | babysit-training | check-failed-run | check-eval | explain-model",
       "status": "PASS | FAIL | SKIPPED | PENDING",
       "artifact_path": "<out-dir>/<skill-name>.json",
       "timestamp": "<ISO-8601>",

@@ -45,6 +45,8 @@ Run complete ML lifecycle:
 /orchestrate-e2e on the medium dataset in demo/
 ```
 
+Run complete ML lifecycle but use [mlscribe](https://github.com/lawwu/mlscribe) to output artfacts:
+
 ```bash
 /orchestrate-e2e on the medium dataset in demo/ but use the mlscribe cli to show me some artifacts. see https://github.com/lawwu/mlscribe
 ```

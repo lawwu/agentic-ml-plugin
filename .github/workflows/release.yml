@@ -1,0 +1,179 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugins/agentic-ml/.claude-plugin/plugin.json'
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from plugin.json
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' plugins/agentic-ml/.claude-plugin/plugin.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          if git rev-parse "refs/tags/v${{ steps.version.outputs.version }}" &>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find previous release tag
+        if: steps.tag_check.outputs.exists == 'false'
+        id: prev_tag
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        if: steps.tag_check.outputs.exists == 'false'
+        id: notes
+        env:
+          PREV_TAG: ${{ steps.prev_tag.outputs.tag }}
+          CURR_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Commit range: from last tag (or root) to HEAD
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          # Collect commits: "<hash> <subject>"
+          git log "$RANGE" --pretty=format:"%H %s" > /tmp/commits.txt
+
+          # Buckets
+          SKILLS="" DOCS="" FIXES="" CHORES="" OTHER=""
+          declare -A AUTHORS
+
+          while IFS= read -r line; do
+            HASH=$(echo "$line" | cut -d' ' -f1)
+            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
+
+            # Author
+            AUTHOR=$(git log -1 --pretty=format:"%an" "$HASH")
+            AUTHOR_LOGIN=$(git log -1 --pretty=format:"%ae" "$HASH")
+            AUTHORS["$AUTHOR"]=1
+
+            # Short hash link
+            SHORT="${HASH:0:7}"
+            REPO="${{ github.repository }}"
+            ENTRY="- ${SUBJECT} (\`${SHORT}\`)"
+
+            # Categorise by conventional-commit prefix or keywords
+            case "$SUBJECT" in
+              feat*|add*|Add*|new*|New*|implement*|Implement*)
+                SKILLS="${SKILLS}"$'\n'"${ENTRY}" ;;
+              fix*|Fix*|bug*|Bug*)
+                FIXES="${FIXES}"$'\n'"${ENTRY}" ;;
+              doc*|Doc*|readme*|README*)
+                DOCS="${DOCS}"$'\n'"${ENTRY}" ;;
+              chore*|Chore*|refactor*|Refactor*|ci*|CI*|build*|Build*|bump*|Bump*)
+                CHORES="${CHORES}"$'\n'"${ENTRY}" ;;
+              *)
+                OTHER="${OTHER}"$'\n'"${ENTRY}" ;;
+            esac
+          done < /tmp/commits.txt
+
+          # All contributors in this range
+          CONTRIBUTORS=$(git log "$RANGE" --pretty=format:"%an" | sort -u | sed 's/^/- /')
+
+          # New contributors: authors who have no commits before PREV_TAG
+          NEW_CONTRIBUTORS=""
+          while IFS= read -r name; do
+            if [ -n "$PREV_TAG" ]; then
+              COUNT=$(git log "${PREV_TAG}" --pretty=format:"%an" 2>/dev/null | grep -Fc "$name" || true)
+            else
+              COUNT=0
+            fi
+            if [ "$COUNT" -eq 0 ]; then
+              NEW_CONTRIBUTORS="${NEW_CONTRIBUTORS}"$'\n'"- $name"
+            fi
+          done < <(git log "$RANGE" --pretty=format:"%an" | sort -u)
+
+          # Build release body
+          {
+            echo "## What's Changed"
+            echo ""
+
+            if [ -n "$SKILLS" ]; then
+              echo "### 🛠 Skills & Features"
+              echo "$SKILLS"
+              echo ""
+            fi
+
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            if [ -n "$DOCS" ]; then
+              echo "### 📚 Documentation"
+              echo "$DOCS"
+              echo ""
+            fi
+
+            if [ -n "$OTHER" ]; then
+              echo "### 🔄 Other Changes"
+              echo "$OTHER"
+              echo ""
+            fi
+
+            if [ -n "$CHORES" ]; then
+              echo "### 🔧 Maintenance"
+              echo "$CHORES"
+              echo ""
+            fi
+
+            if [ -n "$NEW_CONTRIBUTORS" ]; then
+              echo "### 🎉 New Contributors"
+              echo "$NEW_CONTRIBUTORS"
+              echo ""
+            fi
+
+            echo "### 👥 Contributors"
+            echo "$CONTRIBUTORS"
+            echo ""
+
+            if [ -n "$PREV_TAG" ]; then
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${{ steps.version.outputs.version }}"
+            else
+              echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/v${{ steps.version.outputs.version }}"
+            fi
+          } > /tmp/release_notes.md
+
+          # Export as multiline output
+          {
+            echo "body<<RELEASE_BODY_EOF"
+            cat /tmp/release_notes.md
+            echo "RELEASE_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and GitHub release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "agentic-ml ${{ steps.version.outputs.tag }}" \
+            --notes-file /tmp/release_notes.md \
+            --target "${{ github.sha }}"

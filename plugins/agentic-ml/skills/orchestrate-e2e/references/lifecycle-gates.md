@@ -9,7 +9,7 @@ Use these gates in order. Each gate must record evidence and a pass/fail result.
 | 3. Non-ML baseline | Establish performance floor with heuristic methods | At least one baseline method evaluated on primary metric | Baseline results (`build-baseline`) |
 | 4. Dataset quality | Detect hard data blockers before training | No blocker-level leakage/schema/label issues | Dataset audit report (`check-dataset-quality`) |
 | 5. Data pipeline integrity | Verify preprocessing and collation correctness | All required pipeline checks pass on representative sample | Pipeline validation report (`check-data-pipeline`) |
-| 6. Training stability | Ensure run health and recoverability | No unresolved critical anomalies; checkpoint progression observed | Monitoring timeline and run logs (`babysit-training`) |
+| 6. Training stability | Ensure run health and recoverability | No unresolved critical anomalies; checkpoint progression observed | Training run artifact (`train-model`) and monitoring timeline (`babysit-training`) |
 | 7. Evaluation quality | Verify model quality against baseline and thresholds | Primary metric meets threshold; no critical regressions vs. non-ML baseline | Eval report and delta table (`check-eval`) |
 | 8. Interpretability and bias | Ensure model is explainable and bias-free before promotion | No NO-GO blockers from bias or leakage audit; model card produced | Explainability report and model card (`explain-model`) |
 | 9. Promotion decision | Decide whether to move forward | All mandatory gates passed and residual risk accepted | Final GO/NO-GO summary |

@@ -28,6 +28,18 @@ Shared enums used in all skill JSON artifacts. Use these exact strings — do no
 | `SKIPPED` | Gate intentionally bypassed; rationale required |
 | `PENDING` | Gate not yet executed |
 
+## Terminal State
+
+Used in `train-model` and `babysit-training` artifacts.
+
+| Value | Meaning |
+|---|---|
+| `SUCCEEDED` | Training completed normally and reached the target steps/epochs |
+| `FAILED` | Training exited with a non-zero status or unrecoverable error |
+| `CANCELLED` | Training was cancelled by the user or an external signal |
+| `TIMEOUT` | Training hit a wall-clock budget limit before completing |
+| `EARLY_STOPPED` | Training was halted by early stopping logic before reaching max steps/epochs |
+
 ## Confidence
 
 | Value | Meaning |

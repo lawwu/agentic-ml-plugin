@@ -24,7 +24,9 @@ Optional flags:
 
 - `--project PROJECT` — GCP project ID (required for Vertex AI targets; falls back to `gcloud config get-value project`)
 - `--region REGION` — GCP region (default: `us-central1`)
-- `--interval N` — poll every N seconds (default: 30; default 60 for Vertex AI)
+- `--interval N` — initial poll interval in seconds (default: 30; default 60 for Vertex AI)
+- `--max-interval N` — cap for exponential backoff in seconds (default: 300)
+- `--no-backoff` — disable exponential backoff; poll at fixed `--interval`
 - `--once` — take a single snapshot and exit
 - `--no-fix` — observe only, never attempt fixes
 
@@ -56,14 +58,24 @@ On first poll:
 
 ### 3. Continuous monitoring loop
 
+Maintain a current interval starting at `--interval`. Unless `--no-backoff` is set, apply exponential backoff:
+
+- **After each uneventful poll** (no anomaly, loss delta ≤5%, no new epoch/stage, no Vertex AI state change): multiply current interval by 1.5, capped at `--max-interval`
+- **Reset to `--interval`** whenever any of the following occurs:
+  - An anomaly is detected (any severity)
+  - Loss delta > 5% since the previous poll
+  - A new epoch or training stage begins
+  - Vertex AI pipeline task state or job state changes
+
 Poll on each interval. For each poll:
 
 1. Read the latest log lines (or query the metrics API)
 2. Extract the latest step/epoch and metrics
 3. Run anomaly checks (see [references/common-issues.md](references/common-issues.md))
-4. If anomalies are found, diagnose and decide whether to fix or escalate
-5. Report a one-line progress update
-6. Check for terminal conditions (see Stop Conditions below)
+4. If anomalies are found, diagnose and decide whether to fix or escalate; reset interval to `--interval`
+5. Report a one-line progress update (include `next poll in Xs` — see Section 6)
+6. Update the current interval per backoff rules above
+7. Check for terminal conditions (see Stop Conditions below)
 
 After any fix that pushes a change or restarts a process, restart the monitoring loop in the **same turn** — do not wait for the user to re-invoke.
 
@@ -132,7 +144,7 @@ Always state what you are about to do before doing it.
 
 ```
 [HH:MM:SS] Step 1200/10000 (12%) | loss=0.342 | lr=1e-4 | grad_norm=0.8 | 142 samples/s
-  GPU: 94% util, 18.2/24 GB VRAM | ETA: ~1h 23m
+  GPU: 94% util, 18.2/24 GB VRAM | ETA: ~1h 23m | next poll in 45s
 ```
 
 If remote SSH, prefix with `[user@host]`.
@@ -199,18 +211,25 @@ Key fields to populate:
 
 ## Example sessions
 
-**Local/remote training:**
+**Local/remote training (with exponential backoff):**
 
 ```
-/ml-skills:babysit-training user@gpu-box:~/runs/gpt2-finetune/train.log --interval 60
+/ml-skills:babysit-training user@gpu-box:~/runs/gpt2-finetune/train.log --interval 30
 
-[10:03:01] Connecting to gpu-box...
-[10:03:02] Process found: PID 48291 (torchrun, 4 GPUs)
-[10:03:02] Step 340/5000 (6.8%) | loss=2.41 | lr=3e-4 | grad_norm=1.2 | 98 samples/s
-           GPU: 97% util, 62/80 GB VRAM | ETA: ~13h 20m
+[10:03:00] Connecting to gpu-box...
+[10:03:01] Process found: PID 48291 (torchrun, 4 GPUs)
+[10:03:01] Step 340/5000 (6.8%) | loss=2.41 | lr=3e-4 | grad_norm=1.2 | 98 samples/s
+           GPU: 97% util, 62/80 GB VRAM | ETA: ~13h 20m | next poll in 30s
 
-[10:05:03] Step 344/5000 (6.9%) | loss=nan — ANOMALY: NaN loss detected
-  grad_norm spiked to 1842 at step 343. Last checkpoint: step 340 (2m ago).
+[10:03:31] Step 342/5000 (6.8%) | loss=2.39 | lr=3e-4 | grad_norm=1.1 | 99 samples/s
+           GPU: 97% util | ETA: ~13h 18m | next poll in 45s  ← backed off 30s→45s
+
+[10:04:16] Step 345/5000 (6.9%) | loss=2.38 | lr=3e-4 | grad_norm=1.1 | 99 samples/s
+           GPU: 97% util | ETA: ~13h 15m | next poll in 68s  ← backed off 45s→68s
+
+[10:05:24] Step 349/5000 (7.0%) | loss=nan — ANOMALY: NaN loss detected
+  grad_norm spiked to 1842 at step 348. Last checkpoint: step 340 (2m ago).
+  Interval reset to 30s.
   Recommended: roll back to step 340 and reduce lr. Awaiting your approval.
 ```
 

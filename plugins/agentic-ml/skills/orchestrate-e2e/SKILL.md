@@ -76,10 +76,10 @@ Apply the NO-GO halt policy after each gate.
 
 When `--train-cmd` is provided:
 
-- Run the training command
-- Hand off monitoring to `babysit-training`
-- If the run fails or degrades, invoke `check-failed-run` and apply only approved low-risk recovery
-- Apply the NO-GO halt policy after `babysit-training` completes
+- Invoke `train-model` with the training command and any HP config from `plan-experiment.json` (if available in `--out-dir`)
+- Pass `--out-dir <out-dir> --run-id <run_id>` so all sub-artifacts land in the shared directory
+- `train-model` internally handles `babysit-training` monitoring and `check-failed-run` on failure
+- Apply the NO-GO halt policy after `train-model` completes
 
 When `--train-cmd` is missing, request it and wait.
 
@@ -97,6 +97,14 @@ Run `check-eval` on the selected checkpoint/model:
 Run `explain-model` on the promoted checkpoint:
 
 - Apply the NO-GO halt policy after `explain-model` completes
+
+### 5c. Demonstrate value (optional)
+
+If `--business-context` is provided or a business context is clearly inferable from the objective, invoke `demonstrate-value`:
+
+- Pass `--out-dir <out-dir> --run-id <run_id>` and `--business-context` as appropriate
+- This step does **not** affect the promotion decision — it is informational only
+- If `demonstrate-value` fails, log the error and continue to the promotion step
 
 ### 6. Issue promotion decision
 

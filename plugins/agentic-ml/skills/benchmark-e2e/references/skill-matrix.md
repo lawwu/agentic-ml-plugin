@@ -13,7 +13,7 @@ Invoke each skill individually in stage order. Do not use `orchestrate-e2e` as a
 | 3. Non-ML baseline | `build-baseline` |
 | 4. Dataset quality | `check-dataset-quality` |
 | 5. Data pipeline | `check-data-pipeline` |
-| 6. Training stability | `babysit-training` (+ `check-failed-run` if training fails) |
+| 6. Training stability | `train-model` (delegates to `babysit-training` + `check-failed-run` on failure) |
 | 7. Evaluation quality | `check-eval` |
 | 8. Interpretability/bias | `explain-model` |
 | 9. Promotion decision | record final GO/NO-GO from stage results |

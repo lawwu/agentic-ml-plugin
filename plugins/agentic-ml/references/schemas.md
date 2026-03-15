@@ -330,6 +330,68 @@ Written to: `<out-dir>/explain-model.json`
 
 ---
 
+### `train-model`
+
+Written to: `<out-dir>/train-model.json`
+
+```json
+{
+  "train_cmd": "<exact command executed>",
+  "hyperparameters": {"lr": 1e-4, "batch_size": 32},
+  "early_stopping": {
+    "enabled": true,
+    "metric": "eval_loss",
+    "patience": 5,
+    "triggered": false,
+    "triggered_at_step": null
+  },
+  "terminal_state": "SUCCEEDED | FAILED | EARLY_STOPPED | CANCELLED",
+  "total_steps": 5000,
+  "total_epochs": 3,
+  "final_metrics": {"eval_loss": 0.312, "eval_f1": 0.891},
+  "best_checkpoint": "<path or null>",
+  "all_checkpoints": [
+    {"path": "<path>", "step": 1000, "metrics": {"eval_loss": 0.420}}
+  ],
+  "training_duration_seconds": 6180,
+  "babysit_training_ref": "<out-dir>/babysit-training.json"
+}
+```
+
+---
+
+### `demonstrate-value`
+
+Written to: `<out-dir>/demonstrate-value.json`
+
+```json
+{
+  "model": "<path or null>",
+  "business_context": "<plain-language description>",
+  "primary_metric": "<metric name>",
+  "baseline_score": 0.612,
+  "model_score": 0.847,
+  "improvement_delta": 0.235,
+  "business_impact": [
+    {
+      "metric": "<metric name>",
+      "description": "<plain-language impact>",
+      "estimated_value": "<text or null>"
+    }
+  ],
+  "presentation_path": "<out-dir>/value-demo.html",
+  "presentation_sections": ["Problem", "Baseline", "Model Performance", "Key Drivers", "Business Impact", "Risks and Caveats", "Recommendation"],
+  "showboat_version": "<version or null>",
+  "inputs_used": {
+    "eval_results": "<path or null>",
+    "explain_results": "<path or null>",
+    "baseline_results": "<path or null>"
+  }
+}
+```
+
+---
+
 ### `orchestrate-e2e`
 
 Written to: `<out-dir>/run-summary.json`
@@ -344,7 +406,7 @@ Written to: `<out-dir>/run-summary.json`
   "gates": [
     {
       "gate_number": 1,
-      "gate_name": "review-target | plan-experiment | build-baseline | check-dataset-quality | check-data-pipeline | feature-engineer | babysit-training | check-failed-run | check-eval | explain-model",
+      "gate_name": "review-target | plan-experiment | build-baseline | check-dataset-quality | check-data-pipeline | feature-engineer | train-model | babysit-training | check-failed-run | check-eval | explain-model | demonstrate-value",
       "status": "PASS | FAIL | SKIPPED | PENDING",
       "artifact_path": "<out-dir>/<skill-name>.json",
       "timestamp": "<ISO-8601>",

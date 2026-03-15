@@ -13,7 +13,7 @@ Every mode must attempt the same 9 lifecycle stages in order, regardless of mode
 | 3 | Non-ML baseline | Manual heuristic baseline | `build-baseline` | Manual heuristic baseline |
 | 4 | Dataset quality | Manual dataset checks and EDA | `check-dataset-quality` | Manual schema/label inspection |
 | 5 | Data pipeline | Manual preprocessing sanity checks | `check-data-pipeline` | AutoGluon pipeline dry-run |
-| 6 | Training stability | Manual training run and log monitoring | `babysit-training` (+ `check-failed-run` on failure) | AutoGluon `fit()` with runtime logging |
+| 6 | Training stability | Manual training run and log monitoring | `train-model` (+ `babysit-training` + `check-failed-run` on failure) | AutoGluon `fit()` with runtime logging |
 | 7 | Evaluation quality | Manual metric computation and baseline comparison | `check-eval` | AutoGluon leaderboard + holdout metrics |
 | 8 | Interpretability/bias | Manual feature importance and bias review | `explain-model` | AutoGluon feature importance + bias check |
 | 9 | Promotion decision | Manual summary decision | Final `GO`/`NO-GO` from `orchestrate-e2e` | Deployment-readiness recommendation |

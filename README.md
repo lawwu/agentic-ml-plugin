@@ -53,22 +53,23 @@ Run complete ML lifecycle but use [mlscribe](https://github.com/lawwu/mlscribe) 
 
 ## Available Skills
 
-| Skill | Lifecycle stage | Description |
-|-------|----------------|-------------|
-| [review-target](plugins/agentic-ml/skills/review-target/SKILL.md) | Problem framing | Validate label/target definition, leakage risk, metric alignment, and split strategy before modeling |
-| [plan-experiment](plugins/agentic-ml/skills/plan-experiment/SKILL.md) | Pre-training | Design a structured experiment plan with hypothesis, model candidates, HP search space, compute budget, and ordered execution |
-| [build-baseline](plugins/agentic-ml/skills/build-baseline/SKILL.md) | Pre-training | Build and evaluate non-ML baselines (majority class, mean predictor, simple rules) to establish the performance floor ML must beat |
-| [check-dataset-quality](plugins/agentic-ml/skills/check-dataset-quality/SKILL.md) | Pre-training | Profile and validate CSV, Parquet, JSONL, HuggingFace datasets, database tables, or image directories |
-| [check-data-pipeline](plugins/agentic-ml/skills/check-data-pipeline/SKILL.md) | Pre-training | Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, padding, and label encoding issues |
-| [feature-engineer](plugins/agentic-ml/skills/feature-engineer/SKILL.md) | Pre-training | Explore files or database tables and design leakage-safe feature sets tied to label and business outcome |
-| [babysit-training](plugins/agentic-ml/skills/babysit-training/SKILL.md) | Training | Continuously monitor a training run (local, remote SSH, or Vertex AI) until it completes or hits a critical issue |
-| [train-model](plugins/agentic-ml/skills/train-model/SKILL.md) | Training | Launch and manage training with early stopping, HP config, and checkpoint management |
-| [check-failed-run](plugins/agentic-ml/skills/check-failed-run/SKILL.md) | Training | Diagnose a failed or unstable training run, classify root causes, and produce a prioritized recovery plan |
-| [check-eval](plugins/agentic-ml/skills/check-eval/SKILL.md) | Post-training | Evaluate a checkpoint via HF Trainer, lm-evaluation-harness, or a custom script with baseline comparison |
-| [explain-model](plugins/agentic-ml/skills/explain-model/SKILL.md) | Post-eval | Generate feature importance, bias audit, and model card before promotion |
-| [demonstrate-value](plugins/agentic-ml/skills/demonstrate-value/SKILL.md) | Post-eval | Create a visual business value presentation using showboat |
-| [orchestrate-e2e](plugins/agentic-ml/skills/orchestrate-e2e/SKILL.md) | Orchestration | Coordinate the full ML lifecycle with explicit stage gates and a final Go/No-Go decision |
-| [benchmark-e2e](plugins/agentic-ml/skills/benchmark-e2e/SKILL.md) | Meta | Compare E2E workflow approaches (no-plugin/plugin/automl) across scenarios (hard-fraud, hard-attrition, xhard-churn) to measure agent reliability, pitfall detection, and cost |
+| Stage | Skill | Lifecycle stage | Description |
+|-------|-------|----------------|-------------|
+| 1 | [review-target](plugins/agentic-ml/skills/review-target/SKILL.md) | Problem framing | Validate label/target definition, leakage risk, metric alignment, and split strategy before modeling |
+| 2 | [plan-experiment](plugins/agentic-ml/skills/plan-experiment/SKILL.md) | Pre-training | Design a structured experiment plan with hypothesis, model candidates, HP search space, compute budget, and ordered execution |
+| 3 | [build-baseline](plugins/agentic-ml/skills/build-baseline/SKILL.md) | Pre-training | Build and evaluate non-ML baselines (majority class, mean predictor, simple rules) to establish the performance floor ML must beat |
+| 4 | [check-dataset-quality](plugins/agentic-ml/skills/check-dataset-quality/SKILL.md) | Pre-training | Profile and validate CSV, Parquet, JSONL, HuggingFace datasets, database tables, or image directories |
+| 5 | [check-data-pipeline](plugins/agentic-ml/skills/check-data-pipeline/SKILL.md) | Pre-training | Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, padding, and label encoding issues |
+| — | [feature-engineer](plugins/agentic-ml/skills/feature-engineer/SKILL.md) | Pre-training | Explore files or database tables and design leakage-safe feature sets tied to label and business outcome |
+| 6 | [train-model](plugins/agentic-ml/skills/train-model/SKILL.md) | Training | Launch and manage training with early stopping, HP config, and checkpoint management; delegates monitoring to babysit-training |
+| 6b | [babysit-training](plugins/agentic-ml/skills/babysit-training/SKILL.md) | Training | Continuously monitor a training run (local, remote SSH, or Vertex AI) until it completes or hits a critical issue; can also be invoked standalone when training is already running |
+| 6c | [check-failed-run](plugins/agentic-ml/skills/check-failed-run/SKILL.md) | Training | Diagnose a failed or unstable training run, classify root causes, and produce a prioritized recovery plan |
+| 7 | [check-eval](plugins/agentic-ml/skills/check-eval/SKILL.md) | Post-training | Evaluate a checkpoint via HF Trainer, lm-evaluation-harness, or a custom script with baseline comparison |
+| 8 | [explain-model](plugins/agentic-ml/skills/explain-model/SKILL.md) | Post-eval | Generate feature importance, bias audit, and model card before promotion |
+| 9 | [demonstrate-value](plugins/agentic-ml/skills/demonstrate-value/SKILL.md) | Post-eval | Create a visual business value presentation using showboat |
+| 10 | [recommend-new-approaches](plugins/agentic-ml/skills/recommend-new-approaches/SKILL.md) | Post-eval | Recommend new research approaches, modeling ideas, and loss function modifications sorted by expected impact; optionally leverages autoresearch |
+| — | [orchestrate-e2e](plugins/agentic-ml/skills/orchestrate-e2e/SKILL.md) | Orchestration | Coordinate the full ML lifecycle with explicit stage gates and a final Go/No-Go decision |
+| — | [benchmark-e2e](plugins/agentic-ml/skills/benchmark-e2e/SKILL.md) | Meta | Compare E2E workflow approaches (no-plugin/plugin/automl) across scenarios (hard-fraud, hard-attrition, xhard-churn) to measure agent reliability, pitfall detection, and cost |
 
 ## Structured Output
 

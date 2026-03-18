@@ -392,6 +392,39 @@ Written to: `<out-dir>/demonstrate-value.json`
 
 ---
 
+### `recommend-new-approaches`
+
+Written to: `<out-dir>/recommend-new-approaches.json`
+
+```json
+{
+  "model": "<path or null>",
+  "task_type": "classification | regression | ranking | forecasting",
+  "primary_metric": "<metric name>",
+  "current_score": 0.891,
+  "baseline_score": 0.712,
+  "performance_gap": "<text describing gap to target or ideal>",
+  "diagnostic_summary": "<2-3 sentence summary of key weaknesses>",
+  "recommendations": [
+    {
+      "rank": 1,
+      "idea": "<short title>",
+      "rationale": "<grounded in artifact signals>",
+      "category": "architecture | loss | data | training | regularization | other",
+      "expected_impact": "high | medium | low",
+      "effort": "high | medium | low",
+      "next_command": "<concrete CLI command or code change, or null>",
+      "source": "artifact-analysis | literature | autoresearch"
+    }
+  ],
+  "autoresearch_used": false,
+  "autoresearch_path": null,
+  "artifacts_used": ["<path1>", "<path2>"]
+}
+```
+
+---
+
 ### `orchestrate-e2e`
 
 Written to: `<out-dir>/run-summary.json`

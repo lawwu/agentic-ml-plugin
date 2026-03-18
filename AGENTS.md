@@ -10,8 +10,20 @@ When modifying or adding skills, keep these files in sync:
 
 - `plugins/agentic-ml/references/schemas.md` — JSON output schemas for all skills
 - `plugins/agentic-ml/references/vocabulary.md` — canonical enum values
-- plugin version using semver
+- plugin version using semver (`plugins/agentic-ml/.claude-plugin/plugin.json`)
 - `README.md` — Available Skills table and Repository Structure tree
+- `CHANGELOG.md` — add an entry under `[Unreleased]` describing what changed
+
+### Changelog conventions
+
+`CHANGELOG.md` is updated manually alongside code changes. The GitHub release workflow (`.github/workflows/release.yml`) generates release notes independently from `git log` and does **not** read `CHANGELOG.md` — the two are maintained in parallel.
+
+When bumping the plugin version for a release, move the `[Unreleased]` entries under a new versioned heading (e.g. `## [0.3.0] — YYYY-MM-DD`) before merging. Use the same category headings the release workflow uses:
+
+- `### 🛠 Skills & Features` — new skills, new arguments, behavior changes
+- `### 🐛 Bug Fixes` — correctness fixes
+- `### 📚 Documentation` — README, AGENTS.md, reference docs
+- `### 🔧 Maintenance` — CI, dependencies, refactors with no user-visible change
 
 ## Structure
 

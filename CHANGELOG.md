@@ -8,6 +8,10 @@ The format follows the categories used in the automated release workflow (`.gith
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] — 2026-03-18
+
 ### 🛠 Skills & Features
 
 - feat: add `recommend-new-approaches` skill — generates prioritized research directions, modeling ideas, and loss function modifications from training artifacts; optionally leverages [autoresearch](https://github.com/karpathy/autoresearch)
@@ -17,6 +21,7 @@ The format follows the categories used in the automated release workflow (`.gith
 
 - docs: add stage-order column to Available Skills table in README
 - docs: clarify `babysit-training` can be invoked standalone when training is already running
+- docs: add `CHANGELOG.md` and document update convention in `AGENTS.md`
 
 ---
 

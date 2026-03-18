@@ -106,6 +106,15 @@ If `--business-context` is provided or a business context is clearly inferable f
 - This step does **not** affect the promotion decision — it is informational only
 - If `demonstrate-value` fails, log the error and continue to the promotion step
 
+### 5d. Recommend new approaches (always)
+
+After all evaluation and interpretability gates complete, invoke `recommend-new-approaches`:
+
+- Pass `--out-dir <out-dir> --run-id <run_id>` so it picks up all artifacts automatically
+- This step does **not** affect the promotion decision — it is always informational and forward-looking
+- If `recommend-new-approaches` fails, log the error and continue to the promotion step
+- The recommendations should appear in the final run summary as "Next Experiments"
+
 ### 6. Issue promotion decision
 
 Produce a single decision:

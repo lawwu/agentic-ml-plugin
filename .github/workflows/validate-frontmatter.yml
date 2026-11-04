@@ -20,15 +20,27 @@ jobs:
 
       - name: Get changed frontmatter files
         id: changed
-        run: |
-          FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only | grep -E '(agents/.*\.md|skills/.*/SKILL\.md|commands/.*\.md)$' || true)
-          echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$FILES" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          FILES=$(gh pr diff "$PR_NUMBER" --name-only | grep -E '(agents/.*\.md|skills/.*/SKILL\.md|commands/.*\.md)$' || true)
+          # Skip files deleted or renamed away in this PR: they no longer exist in the checkout.
+          EXISTING=""
+          while IFS= read -r f; do
+            if [ -n "$f" ] && [ -f "$f" ]; then
+              EXISTING="${EXISTING}${f}"$'\n'
+            fi
+          done <<< "$FILES"
+          {
+            echo "files<<EOF_CHANGED_FILES"
+            printf '%s' "$EXISTING"
+            echo "EOF_CHANGED_FILES"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Validate frontmatter
         if: steps.changed.outputs.files != ''
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
         run: |
-          echo "${{ steps.changed.outputs.files }}" | xargs bun .github/scripts/validate-frontmatter.ts
+          printf '%s\n' "$CHANGED_FILES" | grep -v '^$' | tr '\n' '\0' | xargs -0 bun .github/scripts/validate-frontmatter.ts

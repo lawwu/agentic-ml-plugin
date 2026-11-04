@@ -5,9 +5,10 @@ Business request: "Flag fraudulent transactions so we can block them."
 
 Intentional pitfalls:
   1. chargeback_initiated_days_ago — only present for fraud cases → perfect target echo
-  2. transaction_reviewed — only 8% of transactions were manually reviewed;
+  2. transaction_reviewed — only ~6% of transactions were manually reviewed;
      labels are confirmed only for reviewed transactions (selection bias);
-     unreviewed transactions assumed non-fraud but many are mislabeled
+     unreviewed transactions are labeled non-fraud, so unreviewed TRUE fraud
+     appears as mislabeled negatives (3 of 60 true fraud with the default seed)
   3. previous_model_risk_score — output of the PREVIOUS fraud model used as a feature;
      creates a feedback loop (model learns to agree with its predecessor, not reality)
   4. Extreme imbalance: 0.3% fraud rate → AUROC meaningless; need AUPRC or precision@k
@@ -21,8 +22,27 @@ Intentional pitfalls:
      fraud (fraudsters create new fingerprints per transaction); value range reveals
      the label (< 2 hours → almost always fraud)
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "numpy>=1.24",
+#   "pandas>=2.0",
+# ]
+# ///
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+parser = argparse.ArgumentParser(description=(__doc__ or "").strip().splitlines()[0])
+parser.add_argument(
+    "--out",
+    default=str(Path(__file__).resolve().parent / "data.csv"),
+    help="Output CSV path (default: data.csv next to this script)",
+)
+args = parser.parse_args()
 
 rng = np.random.default_rng(42)
 n = 20000
@@ -30,15 +50,18 @@ n = 20000
 # 0.3% fraud rate — severe imbalance
 n_fraud = int(n * 0.003)
 n_legit = n - n_fraud
-is_fraud = np.array([True] * n_fraud + [False] * n_legit)
+is_fraud = np.array([True] * n_fraud + [False] * n_legit)  # TRUE fraud (ground truth)
 rng.shuffle(is_fraud)
 
+# Fraud amounts: per row, pick the low (10-500) or high (500-5000) band.
+# Draw order matches the original rng.choice(...).diagonal() construction, which
+# materialized an n x n matrix (~3 GB at n=20,000).
+fraud_amount_low = rng.uniform(10, 500, n)
+fraud_amount_high = rng.uniform(500, 5000, n)
+fraud_amount_band = rng.integers(0, 2, n)
 amount = np.where(
     is_fraud,
-    rng.choice(
-        [rng.uniform(10, 500, n), rng.uniform(500, 5000, n)],
-        n
-    ).diagonal(),
+    np.where(fraud_amount_band == 0, fraud_amount_low, fraud_amount_high),
     np.where(
         rng.random(n) < 0.02,
         rng.uniform(2000, 50000, n),   # legitimate large transactions (B2B)
@@ -86,17 +109,21 @@ prior_model_score = (
     + rng.beta(1, 4, n) * 0.2
 ).clip(0, 1).round(3)
 
-# PITFALL 2: transaction_reviewed — only 8% reviewed; selection bias
+# PITFALL 2: transaction_reviewed — only ~6% reviewed; selection bias
 # Fraud team reviews suspicious transactions, so reviewed=True overrepresents fraud
 reviewed_prob = np.where(is_fraud, 0.90, 0.06)
 transaction_reviewed = rng.binomial(1, reviewed_prob, n).astype(bool)
-# In reality, labels are ONLY confirmed for reviewed transactions
-# Unreviewed non-fraud may contain undetected fraud (5% estimated)
-label_confirmed = transaction_reviewed  # label noise for unreviewed
+# Labels are ONLY confirmed for reviewed transactions
+label_confirmed = transaction_reviewed
+# Observed label: fraud is only recorded when a reviewer confirmed it.
+# Unreviewed fraud is assumed legitimate -> mislabeled negatives (label noise).
+# Behavioral features above still reflect the TRUE fraud status.
+is_fraud_observed = is_fraud & label_confirmed
+n_mislabeled = int((is_fraud & ~label_confirmed).sum())
 
-# PITFALL 1: chargeback_initiated_days_ago — post-outcome, only for fraud
+# PITFALL 1: chargeback_initiated_days_ago — post-outcome, only for (recorded) fraud
 chargeback_initiated_days_ago = np.where(
-    is_fraud,
+    is_fraud_observed,
     rng.integers(1, 45, n),
     np.nan
 )
@@ -122,11 +149,15 @@ df = pd.DataFrame({
     "previous_model_risk_score": prior_model_score,                # PITFALL 3
     "transaction_reviewed": transaction_reviewed,                   # PITFALL 2
     "chargeback_initiated_days_ago": chargeback_initiated_days_ago,# PITFALL 1
-    "is_fraud": is_fraud,
+    "is_fraud": is_fraud_observed,
 })
 
-df.to_csv("data.csv", index=False)
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+df.to_csv(args.out, index=False)
+print(f"Wrote {args.out}")
 print(f"Rows: {len(df)} | Fraud rate: {df.is_fraud.mean():.3%}")
 print(f"Reviewed transactions: {df.transaction_reviewed.mean():.1%}")
+print(f"Mislabeled negatives (true fraud, unreviewed, labeled False): {n_mislabeled} "
+      f"of {int(is_fraud.sum())} true fraud")
 print(f"chargeback null rate (should be ~99.7%): {df.chargeback_initiated_days_ago.isna().mean():.1%}")
 print(f"device_fingerprint_age_hours — fraud median: {df[df.is_fraud].device_fingerprint_age_hours.median():.2f}h  legit median: {df[~df.is_fraud].device_fingerprint_age_hours.median():.0f}h")

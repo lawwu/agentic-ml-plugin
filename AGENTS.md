@@ -65,12 +65,21 @@ plugins/agentic-ml/skills/<skill-name>/
 
 Python scripts should be invoked with `uv run <script>` rather than `python` or `python3`.
 
+- In SKILL.md commands, reference bundled scripts as `"${CLAUDE_SKILL_DIR}/scripts/<script>"` so they resolve when the plugin is installed (the working directory is the user's project, not this repo). Keep markdown links relative (`[scripts/x.py](scripts/x.py)`).
+- Put scripts inside the skill that runs them; files outside `skills/` are not available to other agent harnesses that install skills individually. Other skills reference them as `"${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>"`. The one exception is `plugins/agentic-ml/scripts/provenance.py`, which every skill uses (`"${CLAUDE_PLUGIN_ROOT}/scripts/provenance.py"`); skills must say what to record by hand when it is unavailable.
+- Every Python script must declare its dependencies in a PEP 723 header (`# /// script`) with `requires-python = ">=3.10"`, so `uv run` works in a fresh environment.
+- Scripts must not create files in the user's project as a side effect (for example, use `uv run --no-project` for inline Python).
+
 ## Skill Design Guidelines
 
 - Do not mock data unless the user explicitly asks for it
 - Skills are invoked automatically based on description matching — write descriptions that include the phrases a user or agent would naturally use at each lifecycle stage
 - Each skill should produce a structured, parseable output (e.g. a severity-rated report, a Go/No-Go decision, a results table) so downstream skills and the orchestrator can act on it
 - Every skill must include a **JSON artifact** subsection instructing the agent to write `<skill-name>.json` — see [plugins/agentic-ml/references/schemas.md](plugins/agentic-ml/references/schemas.md) for the base schema and per-skill extensions
+- Every skill includes an **Adapt to the user's level** section that follows [plugins/agentic-ml/references/levels.md](plugins/agentic-ml/references/levels.md). Level changes explanation depth, pauses, and build-vs-review — never checks, thresholds, or approval rules
+- Skills that compute or compare metrics follow [plugins/agentic-ml/references/evaluation-protocol.md](plugins/agentic-ml/references/evaluation-protocol.md): use the locked split, never read test rows outside `check-eval --final`, and report confidence intervals
+- Artifacts from skills that read data or run code include `provenance`
+- Every skill includes a **Record evidence** step that follows [plugins/agentic-ml/references/evidence-notebook.md](plugins/agentic-ml/references/evidence-notebook.md): it appends a section to the run's `evidence.md` with an `exec` block behind each headline number and each `blocker`/`high` finding. Blocks must be deterministic, side-effect free, and fast
 - Use canonical vocabulary from [plugins/agentic-ml/references/vocabulary.md](plugins/agentic-ml/references/vocabulary.md) — `GO / NO-GO / CONDITIONAL` for decisions, `blocker / high / medium / low` for severity
 - Prefer push-down computation (SQL, remote CLI) over pulling data locally when working with large datasets or remote systems
 - Never auto-apply high-risk changes (hyperparameter edits, checkpoint rollbacks, job cancellations) — surface them as `needs-approval` actions and wait

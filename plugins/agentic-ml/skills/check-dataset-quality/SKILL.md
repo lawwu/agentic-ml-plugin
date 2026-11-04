@@ -1,7 +1,7 @@
 ---
 name: check-dataset-quality
-description: Profile and validate a dataset before training. Works with CSV, Parquet, JSONL, HuggingFace datasets, image directories, and database tables (PostgreSQL, MySQL, BigQuery, SQLite, Snowflake). Checks for missing values, duplicates, class imbalance, split leakage, outliers, schema drift, and format issues. Produces a severity-rated audit report with a Go/No-Go recommendation. Triggers automatically when asked to check, audit, validate, or profile a dataset or table.
-argument-hint: "<path-or-hf-dataset-or-table> [--split train|validation|test] [--db-url DSN] [--db-query SQL] [--text-col COLUMN] [--label-col COLUMN] [--id-col COLUMN] [--task classification|regression|language-modeling|image-classification] [--sample N] [--format csv|parquet|jsonl|hf|image-dir|db]"
+description: Profile and validate a dataset before training. Works with CSV, Parquet, JSONL, HuggingFace datasets, image directories, and database tables (PostgreSQL, MySQL, BigQuery, SQLite, Snowflake). Checks for missing values, duplicates, class imbalance, split leakage, outliers, schema drift, personal data, and format issues. Produces a severity-rated audit report with a Go/No-Go recommendation, and saves a data contract and drift baseline from the training split. Triggers automatically when asked to check, audit, validate, or profile a dataset or table.
+argument-hint: "<path-or-hf-dataset-or-table> [--split train|validation|test] [--db-url DSN] [--db-query SQL] [--text-col COLUMN] [--label-col COLUMN] [--id-col COLUMN] [--task classification|regression|language-modeling|image-classification] [--sample N] [--format csv|parquet|jsonl|hf|image-dir|db] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
 # Dataset Audit
@@ -29,6 +29,13 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 - `--format` — force format detection (use `db` to skip file detection)
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: name each pitfall (e.g. "target leakage", "entity overlap") and say how it would inflate metrics.
+- `staff`: summary lists blockers and high findings only.
 
 ## Your responsibilities
 
@@ -87,9 +94,21 @@ Always run these regardless of task type:
 - Cross-split entity overlap via `--id-col`
 - Train rows with timestamps newer than validation/test (if timestamp column detected)
 
+**Splits** (when `<out-dir>/splits/` exists from `review-target`)
+
+- Audit each split separately, and check cross-split leakage on the actual `train` / `val` / `test` keys
+- Profile only the row counts and label rates of `test` — do not explore its feature values
+
+**Personal data**
+
+- Columns whose names suggest personal data (name, email, phone, address, ssn, dob, ip, device id)
+- Text columns matching email, phone, card-number, or national-ID patterns (sample rows; report counts, never the values)
+- Severity: `high` when personal data would be used as a feature or sent to an external service; `medium` otherwise. Recommend dropping, hashing, or tokenizing.
+- For LLM fine-tuning data: also check overlap between training examples and the evaluation set (contamination) — exact and near-duplicate matches are blockers
+
 Run task-specific checks from [references/audit-checks.md](references/audit-checks.md).
 
-Use [`uv run scripts/profile-dataset.py <path> ...`](scripts/profile-dataset.py) for efficient statistical profiling when the dataset is local. For database targets, push as much computation as possible to the DB engine (COUNT, NULL rates, MIN/MAX, APPROX_COUNT_DISTINCT) rather than pulling all rows — see [references/format-loading.md](references/format-loading.md).
+Use [`uv run "${CLAUDE_SKILL_DIR}/scripts/profile-dataset.py" <path> ...`](scripts/profile-dataset.py) for efficient statistical profiling when the dataset is local. For database targets, push as much computation as possible to the DB engine (COUNT, NULL rates, MIN/MAX, APPROX_COUNT_DISTINCT) rather than pulling all rows — see [references/format-loading.md](references/format-loading.md).
 
 ### 3. Severity classification
 
@@ -115,7 +134,30 @@ Each finding must include:
 
 Prefer remediations that preserve data provenance and are reproducible.
 
-### 5. Output format
+### 5. Save the data contract and drift baseline
+
+When the data is tabular, record what "normal" training data looks like, so the same checks can run at retraining and in production:
+
+```bash
+uv run "${CLAUDE_SKILL_DIR}/scripts/data_contract.py" build --data <path> \
+  --splits <out-dir>/splits --split train --label-col <col> [--exclude-cols <id,ts>] --out-dir <out-dir>
+```
+
+Input is CSV; convert Parquet first. This writes:
+
+- `data-contract.json` — per column: type, nullability, observed range or allowed values, and role
+- `training-profile.json` — per feature: quantile bins or category frequencies from `train` (the drift baseline)
+
+To check new data against them later (a new extract, `val`, or a production sample):
+
+```bash
+uv run "${CLAUDE_SKILL_DIR}/scripts/data_contract.py" validate --contract <out-dir>/data-contract.json \
+  --profile <out-dir>/training-profile.json --data <new.csv> --out <out-dir>/contract-validation.json
+```
+
+It reports schema violations and per-feature PSI drift (stable < 0.1, moderate 0.1–0.25, major > 0.25). Validating `val` against the contract is a quick check that the split did not create a distribution shift.
+
+### 6. Output format
 
 ```text
 Dataset Audit Report
@@ -149,6 +191,14 @@ Decision: GO | NO-GO
 Confidence: high|medium|low
 ```
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- per-split row counts and label rates (never feature values from `test`)
+- for each `blocker` and `high` finding: the query or computation that shows it, printing counts and rates only
+- for database sources: the pushed-down read-only SQL and its aggregate result; reference the DSN through an environment variable, never inline credentials
+
 ### JSON artifact
 
 Write `check-dataset-quality.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
@@ -159,8 +209,10 @@ Key fields to populate:
 - `profile`: row/column counts, label distribution
 - `blocker_count`, `high_count`, `medium_count`, `low_count`
 - `findings`: one entry per finding from the audit report with appropriate severity
+- `data_contract_path`, `training_profile_path` when saved
+- `provenance`: data path, size, and sha256 for every file audited (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/provenance.py" --data <path>`, using the project's interpreter)
 
-### 6. Stop conditions
+### 7. Stop conditions
 
 Stop when:
 
@@ -180,7 +232,7 @@ Stop when:
 ## Example
 
 ```text
-/ml-skills:check-dataset-quality hf://allenai/c4 --split train --text-col text --task language-modeling --sample 50000
+/agentic-ml:check-dataset-quality hf://allenai/c4 --split train --text-col text --task language-modeling --sample 50000
 
 Dataset Audit Report
 ====================
@@ -212,7 +264,7 @@ Confidence: high
 ```
 
 ```text
-/ml-skills:check-dataset-quality ml.training_examples --db-url postgresql://user:pass@host/prod --label-col label --id-col user_id --task classification --sample 200000
+/agentic-ml:check-dataset-quality ml.training_examples --db-url postgresql://user:pass@host/prod --label-col label --id-col user_id --task classification --sample 200000
 
 Dataset Audit Report
 ====================
@@ -245,3 +297,4 @@ Confidence: high
 - [references/audit-checks.md](references/audit-checks.md) — Detailed check specifications with thresholds and severity criteria
 - [references/format-loading.md](references/format-loading.md) — Efficient loading patterns per format
 - [scripts/profile-dataset.py](scripts/profile-dataset.py) — Dataset profiling script (run with `uv run`) that outputs JSON stats
+- [scripts/data_contract.py](scripts/data_contract.py) — builds the data contract and drift baseline, and validates new data against them

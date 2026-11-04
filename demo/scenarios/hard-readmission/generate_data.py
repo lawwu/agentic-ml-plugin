@@ -17,8 +17,27 @@ Intentional pitfalls:
   8. discharge_notes_readmission_risk — derived from clinician notes at discharge that
      encode the physician's own readmission risk assessment → target leakage via proxy
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "numpy>=1.24",
+#   "pandas>=2.0",
+# ]
+# ///
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+parser = argparse.ArgumentParser(description=(__doc__ or "").strip().splitlines()[0])
+parser.add_argument(
+    "--out",
+    default=str(Path(__file__).resolve().parent / "data.csv"),
+    help="Output CSV path (default: data.csv next to this script)",
+)
+args = parser.parse_args()
 
 rng = np.random.default_rng(42)
 n = 4000
@@ -113,7 +132,9 @@ df = pd.DataFrame({
     "readmitted_30d": readmitted_30d,
 })
 
-df.to_csv("data.csv", index=False)
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+df.to_csv(args.out, index=False)
+print(f"Wrote {args.out}")
 print(f"Rows: {len(df)} | Readmission rate: {df.readmitted_30d.mean():.1%}")
 print(f"Censored (died before 30d): {df.died_before_30d.sum()} ({df.died_before_30d.mean():.1%})")
 print(f"days_until_readmission null rate: {df.days_until_readmission.isna().mean():.1%}")

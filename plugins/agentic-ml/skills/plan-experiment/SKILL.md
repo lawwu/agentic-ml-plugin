@@ -1,7 +1,7 @@
 ---
 name: plan-experiment
 description: Designs a structured ML experiment plan with hypothesis, model candidates, hyperparameter search space, compute budget, and experiment ordering. Invoke automatically whenever a user has a defined target and wants to start training — even if they just say "let's train a model", "I want to try a few models", or "what should I run first?" Running compute without an experiment plan wastes GPU hours and delays signal.
-argument-hint: "[--task classification|regression|ranking|forecasting] [--data PATH|DATASET] [--metric METRIC] [--budget GPU_HOURS] [--max-candidates N] [--horizon DURATION]"
+argument-hint: "[--task classification|regression|ranking|forecasting] [--data PATH|DATASET] [--metric METRIC] [--budget GPU_HOURS] [--max-candidates N] [--horizon DURATION] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
@@ -19,8 +19,23 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 - `--budget GPU_HOURS` — total compute budget in GPU-hours (default: ask)
 - `--max-candidates N` — maximum model families to evaluate (default: 5)
 - `--horizon DURATION` — prediction window if applicable
+- `--out-dir DIR` — run directory; read upstream artifacts from it and write `plan-experiment.json` to it
+- `--run-id ID` — run ID shared across orchestrated skills
+
+When `--out-dir` contains upstream artifacts, use them:
+
+- `check-dataset-quality.json` — row counts and label distribution for compute estimates and model-family choice
+- `build-baseline.json` — `best_score` is the baseline the success criterion must beat
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: one recommended plan with the reasoning.
+- `senior`: 2–3 candidate plans with trade-offs.
+- `staff`: add cost, timeline, and the result that would stop the project.
 
 ## Your responsibilities
 
@@ -38,6 +53,8 @@ Always include:
 
 - **Candidate #1**: simplest possible baseline (logistic regression, linear regression, decision tree, or frequency prior)
 - Additional candidates ranked by expected signal per compute dollar
+- **Tabular data:** a gradient-boosted tree model (LightGBM, XGBoost, or `HistGradientBoosting`) as an early candidate; `train_tabular.py` in `train-model` covers logistic regression, HGB, and LightGBM
+- **Forecasting:** the bar is the best of `seasonal-naive`, the statistical models, and the zero-shot foundation model from `build-baseline`. Consider fine-tuning that foundation model before a bespoke deep model.
 
 Use [references/hp-search-strategies.md](references/hp-search-strategies.md) for model family guidance. Cap at `--max-candidates` (default 5).
 
@@ -46,8 +63,9 @@ Use [references/hp-search-strategies.md](references/hp-search-strategies.md) for
 For each candidate, specify:
 
 - hyperparameter names, ranges, and scales (log, linear, categorical)
-- search strategy (grid, random, Bayesian, successive halving)
+- search strategy (grid, random, Bayesian, successive halving) — `train-model --sweep` runs it with Optuna and stops weak trials early
 - number of trials and early-stopping rule
+- **where it is tuned:** on `val`, or with cross-validation inside `train`+`val` that matches the split strategy (`GroupKFold` for group splits, rolling-origin for time splits). Prefer cross-validation below ~10,000 rows or ~200 positives. Never tune on `test` — see [../../references/evaluation-protocol.md](../../references/evaluation-protocol.md).
 
 Use [references/hp-search-strategies.md](references/hp-search-strategies.md) for family-specific default ranges.
 
@@ -63,7 +81,7 @@ For each candidate:
 
 Define:
 
-- primary success criterion (metric threshold to beat baseline)
+- primary success criterion: the metric meets the promotion threshold, **and** the paired delta against the best baseline has a 95% interval that excludes zero
 - failure trigger (stop condition per candidate: no improvement after N trials, loss diverges, etc.)
 - wall-clock time-box per candidate
 
@@ -109,6 +127,13 @@ Experiment ordering:
 
 Decision: GO | NO-GO (missing: <what>)
 ```
+
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- a note with the hypothesis, the candidates in order, the budget, and the success criterion
+- an `exec` block printing the facts the plan depends on: row counts and positive rate from `check-dataset-quality.json`, and the best baseline score from `build-baseline.json`
 
 ### JSON artifact
 

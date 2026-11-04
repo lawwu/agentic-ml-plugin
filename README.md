@@ -39,54 +39,109 @@ claude --plugin-dir ~/agentic-ml-plugin/plugins/agentic-ml
 
 ## Sample Prompts
 
+The demo datasets are generated, not committed. From a clone of this repository, generate one first (it writes `demo/scenarios/medium/data.csv`):
+
+```bash
+uv run demo/scenarios/medium/generate_data.py
+```
+
 Run complete ML lifecycle:
 
 ```bash
 /orchestrate-e2e on the medium dataset in demo/
 ```
 
-Run complete ML lifecycle but use [mlscribe](https://github.com/lawwu/mlscribe) to output artfacts:
+Run complete ML lifecycle but use [mlscribe](https://github.com/lawwu/mlscribe) to output artifacts:
 
 ```bash
 /orchestrate-e2e on the medium dataset in demo/ but use the mlscribe cli to show me some artifacts. see https://github.com/lawwu/mlscribe
 ```
 
+Run it as a junior data scientist (explains each step and pauses at every gate):
+
+```bash
+/orchestrate-e2e on the medium dataset in demo/ --level junior
+```
+
+Decide what kind of ML/AI fits a problem before building anything:
+
+```bash
+/select-approach we want to cut the time support agents spend triaging tickets
+```
+
+## How it adapts to you
+
+Tell the plugin your level once — `junior`, `senior`, or `staff` — with `--level`, or save it in `.claude/agentic-ml.local.md`:
+
+```markdown
+---
+level: senior
+autonomy: review-key-gates   # optional
+---
+We use conda, not uv. MLflow tracking server: http://mlflow.internal
+```
+
+| | junior | senior | staff |
+|---|---|---|---|
+| Explanations | Why each finding matters, with the pitfall named | Finding, evidence, fix | Blockers and high risks only |
+| Pauses for review | Every gate | Target and split, before training, promotion | Only on NO-GO, approvals, and promotion |
+| Code | Writes commented scaffolds into your project | Works with your code | Audits your code, notebooks, or PRs |
+
+Level changes how the agent communicates and how often it stops for you. **It never changes the checks, thresholds, the locked test set, or what needs your approval.** See [levels.md](plugins/agentic-ml/references/levels.md).
+
+## What makes the numbers trustworthy
+
+- **An evidence notebook you can re-run.** Every skill records the command behind each headline number and each serious finding, with its real output, in one [showboat](https://github.com/simonw/showboat) notebook per run (`evidence.md`). `uvx showboat --workdir <out-dir> verify <out-dir>/evidence.md` re-runs it and shows any number that no longer reproduces; the orchestrator does this before promotion. See [evidence-notebook.md](plugins/agentic-ml/references/evidence-notebook.md).
+- **The right kind of ML first.** `select-approach` checks whether you need ML at all, then picks between supervised learning, forecasting (including zero-shot time-series foundation models), unsupervised learning, embeddings, prompting an LLM, fine-tuning, RLHF/RLVR, or agents — cheapest first.
+- **A locked test set.** The split is made once and the test set is read once, at promotion, with a hash check.
+- **Uncertainty on every metric.** Bootstrap confidence intervals, a paired comparison against the baseline, slices, calibration, and an explicit operating point.
+- **Provenance.** Git SHA, package versions, lockfile hashes, data hashes, and seeds in every artifact that touches data or code.
+- **Pre-flight checks** before spending compute: loss at init, overfit one batch, save/resume, and too-good-to-be-true scores.
+- **Deployment readiness.** Training/serving parity in a fresh process, latency budgets, a data contract and drift baseline, and monitoring and rollback plans.
+- **ML Test Score.** Each run is scored against Google's 28-test production-readiness rubric, so "ready" means something specific.
+
+The full rules are in [evaluation-protocol.md](plugins/agentic-ml/references/evaluation-protocol.md).
+
 ## Available Skills
 
 | Stage | Skill | Lifecycle stage | Description |
 |-------|-------|----------------|-------------|
-| 1 | [review-target](plugins/agentic-ml/skills/review-target/SKILL.md) | Problem framing | Validate label/target definition, leakage risk, metric alignment, and split strategy before modeling |
-| 2 | [plan-experiment](plugins/agentic-ml/skills/plan-experiment/SKILL.md) | Pre-training | Design a structured experiment plan with hypothesis, model candidates, HP search space, compute budget, and ordered execution |
-| 3 | [build-baseline](plugins/agentic-ml/skills/build-baseline/SKILL.md) | Pre-training | Build and evaluate non-ML baselines (majority class, mean predictor, simple rules) to establish the performance floor ML must beat |
-| 4 | [check-dataset-quality](plugins/agentic-ml/skills/check-dataset-quality/SKILL.md) | Pre-training | Profile and validate CSV, Parquet, JSONL, HuggingFace datasets, database tables, or image directories |
-| 5 | [check-data-pipeline](plugins/agentic-ml/skills/check-data-pipeline/SKILL.md) | Pre-training | Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, padding, and label encoding issues |
-| — | [feature-engineer](plugins/agentic-ml/skills/feature-engineer/SKILL.md) | Pre-training | Explore files or database tables and design leakage-safe feature sets tied to label and business outcome |
-| 6 | [train-model](plugins/agentic-ml/skills/train-model/SKILL.md) | Training | Launch and manage training with early stopping, HP config, and checkpoint management; delegates monitoring to babysit-training |
+| 0 | [select-approach](plugins/agentic-ml/skills/select-approach/SKILL.md) | Problem framing | Decide what kind of ML/AI fits — no ML, supervised, forecasting, unsupervised, embeddings, LLM prompting/RAG, fine-tuning, RLHF/RLVR, or agents — and which lifecycle skills apply |
+| 1 | [review-target](plugins/agentic-ml/skills/review-target/SKILL.md) | Problem framing | Validate label/target definition, leakage risk, metric alignment, and split strategy; create the split and lock the test set |
+| 2 | [check-dataset-quality](plugins/agentic-ml/skills/check-dataset-quality/SKILL.md) | Pre-training | Profile and validate CSV, Parquet, JSONL, HuggingFace datasets, database tables, or image directories; save a data contract and drift baseline |
+| 3 | [build-baseline](plugins/agentic-ml/skills/build-baseline/SKILL.md) | Pre-training | Build non-ML baselines (plus statistical and time-series foundation-model baselines for forecasting) to establish the performance floor ML must beat |
+| 4 | [plan-experiment](plugins/agentic-ml/skills/plan-experiment/SKILL.md) | Pre-training | Design a structured experiment plan with hypothesis, model candidates, HP search space, compute budget, and ordered execution |
+| 4b | [feature-engineer](plugins/agentic-ml/skills/feature-engineer/SKILL.md) | Pre-training | Explore files or database tables and design leakage-safe feature sets tied to label and business outcome (optional; for raw data) |
+| 5 | [check-data-pipeline](plugins/agentic-ml/skills/check-data-pipeline/SKILL.md) | Pre-training | Dry-run a preprocessing pipeline to catch shape, dtype, padding, and label issues — and tabular leakage (preprocessing, target encoding, resampling) |
+| 6 | [train-model](plugins/agentic-ml/skills/train-model/SKILL.md) | Training | Pre-flight checks, native early stopping, sweeps, provenance, and tracking; includes a leakage-safe tabular training scaffold; delegates monitoring to babysit-training |
 | 6b | [babysit-training](plugins/agentic-ml/skills/babysit-training/SKILL.md) | Training | Continuously monitor a training run (local, remote SSH, or Vertex AI) until it completes or hits a critical issue; can also be invoked standalone when training is already running |
 | 6c | [check-failed-run](plugins/agentic-ml/skills/check-failed-run/SKILL.md) | Training | Diagnose a failed or unstable training run, classify root causes, and produce a prioritized recovery plan |
-| 7 | [check-eval](plugins/agentic-ml/skills/check-eval/SKILL.md) | Post-training | Evaluate a checkpoint via HF Trainer, lm-evaluation-harness, or a custom script with baseline comparison |
+| 7 | [check-eval](plugins/agentic-ml/skills/check-eval/SKILL.md) | Post-training | Evaluate tabular models, predictions, HF checkpoints, or harness tasks with confidence intervals, paired baseline comparison, slices, and calibration; runs the one-time final test evaluation |
 | 8 | [explain-model](plugins/agentic-ml/skills/explain-model/SKILL.md) | Post-eval | Generate feature importance, bias audit, and model card before promotion |
-| 9 | [demonstrate-value](plugins/agentic-ml/skills/demonstrate-value/SKILL.md) | Post-eval | Create a visual business value presentation using showboat |
-| 10 | [recommend-new-approaches](plugins/agentic-ml/skills/recommend-new-approaches/SKILL.md) | Post-eval | Recommend new research approaches, modeling ideas, and loss function modifications sorted by expected impact; optionally leverages autoresearch |
-| — | [orchestrate-e2e](plugins/agentic-ml/skills/orchestrate-e2e/SKILL.md) | Orchestration | Coordinate the full ML lifecycle with explicit stage gates and a final Go/No-Go decision |
-| — | [benchmark-e2e](plugins/agentic-ml/skills/benchmark-e2e/SKILL.md) | Meta | Compare E2E workflow approaches (no-plugin/plugin/automl) across scenarios (hard-fraud, hard-attrition, xhard-churn) to measure agent reliability, pitfall detection, and cost |
+| 9 | [check-deployment-readiness](plugins/agentic-ml/skills/check-deployment-readiness/SKILL.md) | Pre-deployment | Training/serving parity, latency and memory budgets, data contract checks, and monitoring, rollout, and rollback plans |
+| — | [demonstrate-value](plugins/agentic-ml/skills/demonstrate-value/SKILL.md) | Post-eval (informational) | Create a business value presentation whose figures are recorded and re-runnable with showboat |
+| — | [recommend-new-approaches](plugins/agentic-ml/skills/recommend-new-approaches/SKILL.md) | Post-eval (informational) | Recommend new research approaches, modeling ideas, and loss function modifications sorted by expected impact; optionally prepares an autoresearch experiment loop |
+| — | [orchestrate-e2e](plugins/agentic-ml/skills/orchestrate-e2e/SKILL.md) | Orchestration | Coordinate the full ML lifecycle (gates 0–10) with review pauses by level, a final test evaluation, and an ML Test Score |
+| — | [benchmark-e2e](plugins/agentic-ml/skills/benchmark-e2e/SKILL.md) | Meta | Compare E2E workflow approaches (no-plugin/plugin/automl) across scenarios (hard-fraud, hard-readmission, xhard-churn) to measure agent reliability, pitfall detection, and cost |
 
 ## Structured Output
 
-Every skill writes a machine-readable JSON artifact alongside its text report. Artifacts share a [common base schema](plugins/agentic-ml/references/schemas.md) with consistent fields (`schema_version`, `skill_name`, `run_id`, `decision`, `confidence`, `findings`, `next_commands`) plus skill-specific extensions.
+Every skill writes a machine-readable JSON artifact alongside its text report. Artifacts share a [common base schema](plugins/agentic-ml/references/schemas.md) with consistent fields (`schema_version`, `skill_name`, `run_id`, `level`, `decision`, `confidence`, `findings`, `next_commands`, `provenance`) plus skill-specific extensions.
 
-Canonical vocabulary (decision values, severities, gate statuses) is defined in [vocabulary.md](plugins/agentic-ml/references/vocabulary.md). All skills use `GO / NO-GO / CONDITIONAL` for decisions and `blocker / high / medium / low` for severity.
+Canonical vocabulary (decision values, severities, gate statuses, approaches, levels) is defined in [vocabulary.md](plugins/agentic-ml/references/vocabulary.md). All skills use `GO / NO-GO / CONDITIONAL` for decisions and `blocker / high / medium / low` for severity.
 
 When run via `orchestrate-e2e`, all skill artifacts are collected in `--out-dir` and an interactive HTML report is generated automatically:
 
 ```bash
-uv run plugins/agentic-ml/report-viewer/generate_report.py <out-dir>
+uv run plugins/agentic-ml/skills/orchestrate-e2e/scripts/generate_report.py <out-dir>
 # → <out-dir>/report.html
 ```
 
-The report includes a gate timeline, per-skill collapsible cards with findings tables, and raw JSON tabs.
+The report includes a gate timeline, the level and approach, the evidence notebook with its verify status, an ML Test Score panel, metrics with confidence intervals, provenance, per-skill cards with findings tables, and raw JSON tabs.
 
 ## Sample Report from `/benchmark-e2e`
+
+Recorded with the earlier stage order (experiment plan and baseline before the dataset-quality check).
 
 ```
   E2E Benchmark Report
@@ -167,7 +222,7 @@ Quick path: create `plugins/agentic-ml/skills/<skill-name>/SKILL.md`, add frontm
 
 ### Test the Plugin Locally
 
-```
+```bash
 claude --plugin-dir ./plugins/agentic-ml
 ```
 

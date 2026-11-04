@@ -22,8 +22,27 @@ Intentional pitfalls (composite — no single-column leakage):
   8. Feature staleness: nps_score is updated only annually; stale for 3 of 4
      quarters per year
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "numpy>=1.24",
+#   "pandas>=2.0",
+# ]
+# ///
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+parser = argparse.ArgumentParser(description=(__doc__ or "").strip().splitlines()[0])
+parser.add_argument(
+    "--out",
+    default=str(Path(__file__).resolve().parent / "data.csv"),
+    help="Output CSV path (default: data.csv next to this script)",
+)
+args = parser.parse_args()
 
 rng = np.random.default_rng(42)
 
@@ -214,7 +233,9 @@ df = df[df["snapshot_quarter"] <= df["churn_quarter"]].drop(columns=["churn_quar
 # Actually keep it — agents should notice label drift correlates with this column
 
 df = df.reset_index(drop=True)
-df.to_csv("data.csv", index=False)
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+df.to_csv(args.out, index=False)
+print(f"Wrote {args.out}")
 
 # Summary stats
 print(f"Rows: {len(df)} | Companies: {df.company_id.nunique()}")

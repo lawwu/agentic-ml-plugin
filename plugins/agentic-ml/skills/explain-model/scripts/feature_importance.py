@@ -1,22 +1,36 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """
 feature_importance.py — Standardized feature importance computation for explain-model.
 
-Supports SHAP (TreeExplainer, DeepExplainer, KernelExplainer),
-permutation importance, and model built-in importance.
+Supports SHAP (TreeExplainer, KernelExplainer), permutation importance, and
+model built-in importance. Binary and multiclass classifiers are supported;
+for multiclass, SHAP importance is mean |SHAP| averaged over classes.
 
 Usage:
-    uv run scripts/feature_importance.py \
+    uv run "${CLAUDE_SKILL_DIR}/scripts/feature_importance.py" \
         --model <path> \
         --data <path> \
         --label-col <col> \
         --method auto|shap|permutation|builtin \
         --out-dir <dir>
+
+Models pickled with libraries outside the core dependencies need them added
+at run time, e.g. `uv run --with xgboost ...` or `uv run --with lightgbm ...`.
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "pandas>=2.0",
+#   "numpy>=1.24",
+#   "scikit-learn>=1.3",
+#   "shap>=0.44",
+#   "joblib>=1.3",
+#   "pyarrow>=14",
+# ]
+# ///
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -148,19 +162,50 @@ def compute_shap(model, X, shap_sample: int) -> dict:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(X)
     else:
-        # KernelExplainer — sample background for speed
+        # KernelExplainer — sample background for speed. Wrap the predict function so
+        # pipelines that expect named DataFrame columns still work.
+        import pandas as pd
+
+        cols = list(X.columns)
+        predict = model.predict_proba if hasattr(model, "predict_proba") else model.predict
+
+        def predict_fn(data):
+            if not isinstance(data, pd.DataFrame):
+                data = pd.DataFrame(data, columns=cols)
+            return predict(data)
+
         background = X.sample(min(shap_sample, len(X)), random_state=42)
-        explainer = shap.KernelExplainer(model.predict, background)
+        explainer = shap.KernelExplainer(predict_fn, background)
         shap_values = explainer.shap_values(X.sample(min(shap_sample, len(X)), random_state=0))
 
-    # Handle multi-class (list of arrays) → use class 1 or mean across classes
-    if isinstance(shap_values, list):
-        shap_array = np.abs(np.array(shap_values)).mean(axis=0)
-    else:
-        shap_array = np.abs(shap_values)
+    shap_array = _shap_to_samples_features_outputs(shap_values, n_features=X.shape[1])
+    # mean |SHAP| over samples, then averaged over outputs (classes)
+    mean_abs = np.abs(shap_array).mean(axis=0).mean(axis=-1)
+    return dict(zip(X.columns, (float(v) for v in mean_abs)))
 
-    mean_abs = shap_array.mean(axis=0)
-    return dict(zip(X.columns, mean_abs.tolist()))
+
+def _shap_to_samples_features_outputs(shap_values, n_features: int):
+    """Normalize SHAP output to a 3-D array of shape (samples, features, outputs).
+
+    Handles: 2-D arrays (regression / binary margin), lists of per-class 2-D arrays
+    (shap < 0.45), and 3-D (samples, features, classes) arrays (shap >= 0.45).
+    """
+    import numpy as np
+
+    if isinstance(shap_values, list):
+        arr = np.stack([np.asarray(v) for v in shap_values], axis=-1)
+    else:
+        arr = np.asarray(shap_values)
+    if arr.ndim == 2:
+        arr = arr[:, :, np.newaxis]
+    if arr.ndim != 3:
+        raise ValueError(f"Unexpected SHAP output shape {arr.shape}")
+    if arr.shape[1] != n_features and arr.shape[2] == n_features:
+        # (samples, classes, features) layout
+        arr = np.transpose(arr, (0, 2, 1))
+    if arr.shape[1] != n_features:
+        raise ValueError(f"SHAP output shape {arr.shape} does not match {n_features} features")
+    return arr
 
 
 def compute_permutation(model, X, y, n_repeats: int, scoring) -> dict:
@@ -199,7 +244,8 @@ def compute_builtin(model, X) -> dict:
 
 def rank_features(importance_dict: dict, top_n: int) -> list[dict]:
     """Sort features by importance and assign ranks."""
-    sorted_items = sorted(importance_dict.items(), key=lambda x: x[1], reverse=True)
+    items = [(str(name), float(score)) for name, score in importance_dict.items()]
+    sorted_items = sorted(items, key=lambda x: x[1], reverse=True)
     return [
         {"rank": i + 1, "feature": name, "importance": round(score, 6)}
         for i, (name, score) in enumerate(sorted_items[:top_n])
@@ -235,18 +281,35 @@ def main() -> None:
 
     print(f"Loading model from: {args.model}")
     model = load_model(args.model)
+    if isinstance(model, tuple):
+        print(
+            "Error: HuggingFace checkpoints are not supported by this script; "
+            "use token attribution (e.g. shap.Explainer with a text masker) instead.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     method = detect_method(model, args.method)
     print(f"Method: {method}")
 
+    importance = None
     if method == "shap":
-        importance = compute_shap(model, X, args.shap_sample)
-    elif method == "permutation":
-        importance = compute_permutation(model, X, y, args.n_repeats, args.scoring)
-    elif method == "builtin":
-        importance = compute_builtin(model, X)
-    else:
-        raise ValueError(f"Unknown method: {method}")
+        try:
+            importance = compute_shap(model, X, args.shap_sample)
+        except Exception as e:  # e.g. shap does not support multiclass GradientBoosting
+            if args.method == "shap":
+                raise
+            print(f"SHAP failed ({type(e).__name__}: {e}); falling back to permutation importance.",
+                  file=sys.stderr)
+            method = "permutation"
+
+    if importance is None:
+        if method == "permutation":
+            importance = compute_permutation(model, X, y, args.n_repeats, args.scoring)
+        elif method == "builtin":
+            importance = compute_builtin(model, X)
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
     ranked = rank_features(importance, args.top_n)
     save_results(ranked, method, args.out_dir)

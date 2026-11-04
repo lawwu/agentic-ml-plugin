@@ -1,7 +1,7 @@
 ---
 name: feature-engineer
 description: Explores data sources and engineers leakage-safe model features from files or databases. Use when asked to create features from raw tables/datasets, design joins and aggregations for a target label, improve model signal, or map business outcomes into trainable predictor sets. Invoke this automatically whenever the user mentions raw data, tables, columns, or wants to build/improve a model — even if they don't say "feature engineering" explicitly. Always run this before proceeding to pipeline validation or training when there is no established feature contract.
-argument-hint: "[--data PATH|DATASET] [--db-url DSN] [--tables T1,T2,...] [--label-col COLUMN] [--entity-col COLUMN] [--timestamp-col COLUMN] [--outcome TEXT] [--task classification|regression|ranking|forecasting] [--out-dir DIR]"
+argument-hint: "[--data PATH|DATASET] [--db-url DSN] [--tables T1,T2,...] [--label-col COLUMN] [--entity-col COLUMN] [--timestamp-col COLUMN] [--outcome TEXT] [--task classification|regression|ranking|forecasting] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
 # Feature Engineer
@@ -23,6 +23,13 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 - `--out-dir DIR` — output directory for feature spec and implementation snippets
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: explain point-in-time correctness with an example from their own tables.
+- `staff`: audit existing feature code and SQL for leakage instead of writing new features.
 
 ## Your responsibilities
 
@@ -125,6 +132,14 @@ Next commands:
 `GO`: feature contract complete, no blockers.
 `CONDITIONAL`: feature brief is complete but one or more features carry medium/high leakage risk that should be tracked.
 `NO-GO`: critical source information is missing or blockers prevent building a valid feature set.
+
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- for each feature family: a note with its hypothesis; save the SQL or Python under `<out-dir>/features/`
+- an `exec` block for the point-in-time check — e.g. the count of feature rows whose timestamp is after the prediction time, which must print `0`
+- for each blocked feature: the computation that shows the leakage
 
 ### JSON artifact
 

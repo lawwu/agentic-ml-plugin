@@ -4,41 +4,78 @@ generate_benchmark_report.py — Read benchmark-report.json from a benchmark run
 directory and produce a self-contained HTML scorecard.
 
 Usage:
-    uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir>
-    uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir> --out benchmark-report.html
+    uv run "${CLAUDE_SKILL_DIR}/scripts/generate_benchmark_report.py" <run-dir>
+    uv run "${CLAUDE_SKILL_DIR}/scripts/generate_benchmark_report.py" <run-dir> --out benchmark-report.html
 """
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.10"
 # dependencies = []
 # ///
+from __future__ import annotations
 
 import argparse
+import html
 import json
+import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+# Every value read from benchmark-report.json goes through _e() before it is
+# placed in the HTML.
 
-def _badge(value: str) -> str:
-    cls = {
-        "GO": "go", "NO-GO": "nogo", "CONDITIONAL": "cond",
-        "PASS": "go", "FAIL": "nogo", "SKIPPED": "skipped",
-    }.get(str(value).upper(), "skipped")
-    label = "NO-GO" if str(value).upper() == "NO-GO" else value
-    return f'<span class="badge badge-{cls}">{label}</span>'
+def _e(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value)
+    return html.escape(str(value), quote=True)
 
 
-def _score_bar(score: int | float | str) -> str:
-    if score == "unknown" or score is None:
-        return '<span class="muted">—</span>'
-    score = int(score)
-    color = "#16a34a" if score >= 70 else "#d97706" if score >= 45 else "#dc2626"
+def _num(value) -> float | None:
+    """Coerce to a finite float, or None."""
+    if isinstance(value, bool):
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def _list(value) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+BADGE_CLASS = {
+    "GO": "go", "NO-GO": "nogo", "CONDITIONAL": "cond",
+    "PASS": "go", "FAIL": "nogo", "SKIPPED": "skipped", "PENDING": "skipped",
+}
+
+
+def _badge(value) -> str:
+    label = str(value)
+    cls = BADGE_CLASS.get(label.upper(), "skipped")
+    return f'<span class="badge badge-{cls}">{_e(label)}</span>'
+
+
+def _score_bar(score) -> str:
+    n = _num(score)
+    if n is None:
+        return '<span class="muted">—</span>' if score in (None, "", "unknown") else _e(score)
+    color = "#16a34a" if n >= 70 else "#d97706" if n >= 45 else "#dc2626"
+    width = max(0.0, min(100.0, n))
+    shown = int(n) if n == int(n) else round(n, 1)
     return (
         f'<div class="score-bar-wrap">'
-        f'<div class="score-bar" style="width:{score}%;background:{color}"></div>'
-        f'<span class="score-num">{score}</span>'
+        f'<div class="score-bar" style="width:{width:.0f}%;background:{color}"></div>'
+        f'<span class="score-num">{_e(shown)}</span>'
         f'</div>'
     )
 
@@ -46,64 +83,36 @@ def _score_bar(score: int | float | str) -> str:
 def _cell(value) -> str:
     if value is None or value == "unknown":
         return '<td class="muted">unknown</td>'
-    return f"<td>{value}</td>"
+    return f"<td>{_e(value)}</td>"
 
 
-STAGE_LABELS = [
-    "1. Target readiness",
-    "2. Experiment plan",
-    "3. Dataset quality",
-    "4. Data pipeline",
-    "5. Training stability",
-    "6. Evaluation quality",
-    "7. Interpretability/bias",
-    "8. Promotion decision",
+# Lifecycle stages in gate order. stage_coverage[mode] may be keyed by the
+# skill name (preferred), the label, or the numbered label ("1. Target readiness").
+STAGES = [
+    ("review-target", "Target readiness"),
+    ("check-dataset-quality", "Dataset quality"),
+    ("build-baseline", "Non-ML baseline"),
+    ("plan-experiment", "Experiment plan"),
+    ("check-data-pipeline", "Data pipeline"),
+    ("train-model", "Training stability"),
+    ("check-eval", "Evaluation quality"),
+    ("explain-model", "Interpretability/bias"),
+    ("promotion-decision", "Promotion decision"),
 ]
 
-PITFALL_KEYS_BY_SCENARIO = {
-    "hard-fraud": [
-        ("target_echo", "Target echo"),
-        ("near_perfect_leak", "Near-perfect leak"),
-        ("wrong_metric", "Wrong metric (AUC vs AUPRC)"),
-        ("selection_bias", "Selection bias"),
-        ("geographic_proxy", "Geographic proxy bias"),
-        ("split_boundary", "Split boundary / concept drift"),
-        ("feedback_loop", "Feedback loop"),
-    ],
-    "hard-attrition": [
-        ("target_echo", "Target echo"),
-        ("label_ambiguity", "Label ambiguity"),
-        ("survivorship_bias", "Survivorship bias"),
-        ("endogenous_feature", "Endogenous feature"),
-        ("protected_proxy", "Protected attribute proxy"),
-        ("high_cardinality_proxy", "High-cardinality proxy"),
-        ("disparate_impact", "Disparate impact (gender/ethnicity)"),
-    ],
-    "xhard-churn": [
-        ("composite_leak", "Composite leak (tickets × login)"),
-        ("entity_temporal_leak", "Entity-level temporal leakage"),
-        ("survivorship_bias", "Survivorship bias"),
-        ("label_drift", "Label definition drift (Q4+)"),
-        ("future_peeking", "Future-peeking feature"),
-        ("simpsons_paradox", "Simpson's paradox (discount_pct)"),
-        ("protected_proxy", "Protected proxy (region → size)"),
-        ("feature_staleness", "Feature staleness (nps_score)"),
-    ],
-}
-
-# Default fallback pitfall keys (union of common ones)
-PITFALL_KEYS_DEFAULT = [
-    ("target_echo", "Target echo"),
-    ("near_perfect_leak", "Near-perfect leak"),
-    ("wrong_metric", "Wrong metric"),
-    ("selection_bias", "Selection bias"),
-    ("split_boundary", "Split boundary"),
-    ("feedback_loop", "Feedback loop"),
+# Skills expected in plugin mode when no explicit skill_audit is provided.
+# babysit-training / check-failed-run are invoked by train-model as needed.
+PLUGIN_EXPECTED_SKILLS = [
+    "review-target", "check-dataset-quality", "build-baseline", "plan-experiment",
+    "check-data-pipeline", "train-model", "check-eval", "explain-model",
 ]
 
 
-def get_pitfall_keys(scenario: str) -> list:
-    return PITFALL_KEYS_BY_SCENARIO.get(scenario, PITFALL_KEYS_DEFAULT)
+def _stage_cell(coverage: dict, index: int, skill: str, label: str):
+    for key in (skill, label, f"{index}. {label}"):
+        if key in coverage:
+            return coverage[key]
+    return None
 
 # ── HTML template ─────────────────────────────────────────────────────────────
 
@@ -242,15 +251,20 @@ HTML_TEMPLATE = """\
 # ── rendering ──────────────────────────────────────────────────────────────────
 
 def render_results_rows(results: list) -> str:
-    sorted_results = sorted(results, key=lambda r: -(r.get("total_score") or 0))
+    rows_in = [_dict(r) for r in results]
+    sorted_results = sorted(
+        rows_in,
+        key=lambda r: _num(r.get("total_score")) if _num(r.get("total_score")) is not None else -math.inf,
+        reverse=True,
+    )
     rows = []
     for rank, r in enumerate(sorted_results, 1):
         cls = f"rank-{rank}" if rank <= 3 else ""
         rows.append(
             f'<tr class="{cls}">'
             f"<td><strong>#{rank}</strong></td>"
-            f"<td><strong>{r.get('mode','?')}</strong></td>"
-            f"<td>{r.get('scenario','?')}</td>"
+            f"<td><strong>{_e(r.get('mode', '?'))}</strong></td>"
+            f"<td>{_e(r.get('scenario', '?'))}</td>"
             f"<td>{_score_bar(r.get('quality_score'))}</td>"
             f"<td>{_score_bar(r.get('reliability_score'))}</td>"
             f"<td>{_score_bar(r.get('efficiency_score'))}</td>"
@@ -267,20 +281,22 @@ def render_results_rows(results: list) -> str:
 
 def render_stage_rows(data: dict) -> tuple[str, str]:
     """Return (mode_headers, stage_rows)."""
-    results = data.get("results", [])
-    modes = [r.get("mode", "?") for r in results]
-    headers = "".join(f"<th>{m}</th>" for m in modes)
+    modes = []
+    for r in _list(data.get("results")):
+        mode = str(_dict(r).get("mode", "?"))
+        if mode not in modes:
+            modes.append(mode)
+    headers = "".join(f"<th>{_e(m)}</th>" for m in modes)
 
-    # Build stage coverage from results if present, else placeholder
-    stage_coverage = data.get("stage_coverage", {})
+    stage_coverage = _dict(data.get("stage_coverage"))
 
     rows = []
-    for label in STAGE_LABELS:
-        row = f'<tr><td><strong>{label}</strong></td>'
+    for i, (skill, label) in enumerate(STAGES, 1):
+        row = f"<tr><td><strong>{i}. {_e(label)}</strong></td>"
         for mode in modes:
-            cell = stage_coverage.get(mode, {}).get(label, "—")
-            if cell == "—":
-                row += f'<td class="stage-cell muted">—</td>'
+            cell = _stage_cell(_dict(stage_coverage.get(mode)), i, skill, label)
+            if cell in (None, "", "—"):
+                row += '<td class="stage-cell muted">—</td>'
             else:
                 row += f'<td class="stage-cell">{_badge(cell)}</td>'
         row += "</tr>"
@@ -289,23 +305,35 @@ def render_stage_rows(data: dict) -> tuple[str, str]:
     return headers, "\n      ".join(rows)
 
 
+def _join(items, empty: str) -> str:
+    items = [_e(x) for x in _list(items)]
+    return ", ".join(items) if items else empty
+
+
+NONE_HTML = '<span class="muted">none</span>'
+
+
 def render_skill_audit(data: dict) -> str:
-    audit = data.get("skill_audit", [])
+    audit = _list(data.get("skill_audit"))
     if not audit:
         # Derive minimal from results
         rows = []
-        for r in data.get("results", []):
-            mode = r.get("mode", "?")
+        seen = set()
+        for r in _list(data.get("results")):
+            mode = str(_dict(r).get("mode", "?"))
+            if mode in seen:
+                continue
+            seen.add(mode)
             if mode == "plugin":
                 rows.append(
-                    f"<tr><td>{mode}</td>"
-                    f"<td>review-target, plan-experiment, check-dataset-quality,<br>check-data-pipeline, babysit-training, check-eval, explain-model</td>"
+                    f"<tr><td>{_e(mode)}</td>"
+                    f"<td>{_e(', '.join(PLUGIN_EXPECTED_SKILLS))}</td>"
                     f"<td><em>(as invoked)</em></td>"
                     f"<td>—</td><td>—</td></tr>"
                 )
             else:
                 rows.append(
-                    f"<tr><td>{mode}</td>"
+                    f"<tr><td>{_e(mode)}</td>"
                     f"<td class='muted'>none (0 expected)</td>"
                     f"<td class='muted'>none</td>"
                     f"<td>—</td><td>—</td></tr>"
@@ -313,31 +341,37 @@ def render_skill_audit(data: dict) -> str:
         return "\n      ".join(rows)
 
     rows = []
-    for entry in audit:
+    for raw in audit:
+        entry = _dict(raw)
         rows.append(
             f"<tr>"
-            f"<td>{entry.get('mode','?')}</td>"
-            + ("<td>" + (", ".join(entry.get("expected", [])) or '<span class="muted">none</span>') + "</td>")
-            + ("<td>" + (", ".join(entry.get("actual", [])) or '<span class="muted">none</span>') + "</td>")
-            + ("<td>" + (", ".join(entry.get("missing", [])) or "—") + "</td>")
-            + ("<td>" + (", ".join(entry.get("extra", [])) or "—") + "</td>")
-            + "</tr>"
+            f"<td>{_e(entry.get('mode', '?'))}</td>"
+            f"<td>{_join(entry.get('expected'), NONE_HTML)}</td>"
+            f"<td>{_join(entry.get('actual'), NONE_HTML)}</td>"
+            f"<td>{_join(entry.get('missing'), '—')}</td>"
+            f"<td>{_join(entry.get('extra'), '—')}</td>"
+            "</tr>"
         )
     return "\n      ".join(rows)
 
 
+SEVERITIES = ("blocker", "high", "medium", "low")
+
+
 def render_findings(findings: list) -> str:
+    findings = [_dict(f) for f in _list(findings)]
     if not findings:
         return ""
     items = []
     for f in findings:
-        sev = f.get("severity", "low")
+        sev = str(f.get("severity", "low")).lower()
+        sev = sev if sev in SEVERITIES else "low"
         fix = f.get("fix", "")
-        fix_html = f'<div class="finding-fix">Fix: {fix}</div>' if fix else ""
+        fix_html = f'<div class="finding-fix">Fix: {_e(fix)}</div>' if fix else ""
         items.append(
             f'<div class="finding finding-{sev}">'
-            f'<div class="finding-title">[{sev.upper()}] {f.get("title","")}</div>'
-            f'<div class="finding-body">{f.get("description","")}</div>'
+            f'<div class="finding-title">[{sev.upper()}] {_e(f.get("title", ""))}</div>'
+            f'<div class="finding-body">{_e(f.get("description", ""))}</div>'
             f"{fix_html}"
             f"</div>"
         )
@@ -349,6 +383,7 @@ def render_findings(findings: list) -> str:
 
 
 def render_recommendation(rec: dict) -> str:
+    rec = _dict(rec)
     default = rec.get("default_mode", "—")
     default_why = rec.get("default_mode_rationale", "")
     fallback = rec.get("fallback_mode", "—")
@@ -356,12 +391,12 @@ def render_recommendation(rec: dict) -> str:
 
     return (
         f'<div class="rec-card">'
-        f'<h3>✅ Default mode: <code>{default}</code></h3>'
-        f"<p>{default_why}</p>"
+        f'<h3>✅ Default mode: <code>{_e(default)}</code></h3>'
+        f"<p>{_e(default_why)}</p>"
         f"</div>"
         f'<div class="rec-card">'
-        f'<h3>↩ Fallback mode: <code>{fallback}</code></h3>'
-        f"<p>{fallback_why}</p>"
+        f'<h3>↩ Fallback mode: <code>{_e(fallback)}</code></h3>'
+        f"<p>{_e(fallback_why)}</p>"
         f"</div>"
     )
 
@@ -386,47 +421,48 @@ def main() -> None:
 
     out_path = Path(args.out).resolve() if args.out else run_dir / "benchmark-report.html"
 
-    with open(report_path) as f:
-        data = json.load(f)
+    try:
+        with open(report_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Error: could not parse {report_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"Error: {report_path} must contain a JSON object", file=sys.stderr)
+        sys.exit(1)
 
     run_id          = data.get("run_id", "unknown")
     scenario        = data.get("selected_scenario", "unknown")
     scenario_det    = data.get("scenario_detection", "auto")
     primary_metric  = data.get("primary_metric", "unknown")
-    modes           = data.get("modes", [])
+    modes           = [str(m) for m in _list(data.get("modes"))]
     timestamp       = data.get("timestamp", "")
-    results         = data.get("results", [])
-    findings        = data.get("findings", [])
-    recommendation  = data.get("recommendation", {})
-    decision        = data.get("decision", "GO")
+    results         = _list(data.get("results"))
+    findings        = _list(data.get("findings"))
+    recommendation  = _dict(data.get("recommendation"))
+    decision        = str(data.get("decision", "GO"))
 
-    results_rows        = render_results_rows(results)
     stage_headers, stage_rows = render_stage_rows(data)
-    skill_audit_rows    = render_skill_audit(data)
-    findings_section    = render_findings(findings)
-    recommendation_html = render_recommendation(recommendation)
-    decision_cls        = decision.lower().replace("-", "")
-    overall_badge       = f'<span class="badge badge-{decision_cls}">{decision}</span>'
 
-    html = HTML_TEMPLATE.format(
-        run_id=run_id,
-        scenario=scenario,
-        scenario_detection=scenario_det,
-        primary_metric=primary_metric,
-        modes_str=", ".join(modes),
-        timestamp=timestamp,
-        overall_badge=overall_badge,
-        results_rows=results_rows,
+    page = HTML_TEMPLATE.format(
+        run_id=_e(run_id),
+        scenario=_e(scenario),
+        scenario_detection=_e(scenario_det),
+        primary_metric=_e(primary_metric),
+        modes_str=_e(", ".join(modes)),
+        timestamp=_e(timestamp),
+        overall_badge=_badge(decision),
+        results_rows=render_results_rows(results),
         stage_mode_headers=stage_headers,
         stage_rows=stage_rows,
-        skill_audit_rows=skill_audit_rows,
-        findings_section=findings_section,
-        recommendation_html=recommendation_html,
+        skill_audit_rows=render_skill_audit(data),
+        findings_section=render_findings(findings),
+        recommendation_html=render_recommendation(recommendation),
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
     )
 
-    with open(out_path, "w") as f:
-        f.write(html)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(page)
 
     print(f"Benchmark report written to: {out_path}")
     print(f"  Run ID:   {run_id}")

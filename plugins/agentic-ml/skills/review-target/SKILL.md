@@ -1,7 +1,7 @@
 ---
 name: review-target
 description: Reviews and validates machine learning target/label definitions against business outcomes before modeling. Use when asked to define or audit the prediction target, select metrics, set acceptance criteria, detect leakage risk, or choose split strategy for a new ML project. Invoke this automatically whenever a user mentions a business outcome, KPI, or states what they want to predict — before any data is loaded or features are engineered. Skipping target review is the single most common cause of wasted ML effort; always run this first on a new project.
-argument-hint: "<business-outcome> [--data SOURCE] [--label-col COLUMN] [--entity-col COLUMN] [--timestamp-col COLUMN] [--horizon DURATION] [--task classification|regression|ranking|forecasting]"
+argument-hint: "<business-outcome> [--data SOURCE] [--label-col COLUMN] [--entity-col COLUMN] [--timestamp-col COLUMN] [--horizon DURATION] [--task classification|regression|ranking|forecasting] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
 # Review Target
@@ -21,6 +21,13 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 - `--task` — modeling task family
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: walk through each part of the prediction contract with an example row from their data.
+- `staff`: focus on whether the target matches the business decision, and who owns the promotion threshold.
 
 ## Your responsibilities
 
@@ -63,13 +70,26 @@ Use [references/metric-playbook.md](references/metric-playbook.md) to select:
 - minimum threshold for promotion
 - decision-threshold policy (for probabilistic outputs)
 
-### 5. Choose split strategy
+### 5. Choose the split strategy and lock the test set
 
-Recommend split policy based on task/data:
+Recommend the split policy from the task and data, following [../../references/evaluation-protocol.md](../../references/evaluation-protocol.md):
 
-- random, stratified, group-aware, or time-based split
-- rationale tied to deployment scenario
-- minimum validation sample requirements
+- `random`, `stratified`, `group`, or `time` — with the rationale tied to how the model will be used
+- a gap between train and evaluation periods when labels mature after a delay
+- minimum evaluation sample: at least ~30 positives (classification) or ~100 rows in each of `val` and `test`
+- for forecasting: the horizon, the number of backtest origins, and the step between them
+
+When `--data` is available, create the split once and lock the test set:
+
+```bash
+uv run "${CLAUDE_SKILL_DIR}/scripts/make_splits.py" --data <path> --label-col <col> \
+  --strategy <random|stratified|group|time> [--id-col <col>] [--group-col <col>] [--time-col <col>] \
+  [--gap 30d] --seed 42 --out-dir <out-dir>
+```
+
+This writes `<out-dir>/splits/split_assignments.csv` and `split-manifest.json` (with `test_keys_sha256`). Every later skill reads these files. Review the manifest's `warnings` — a test split with too few positives, or a random split on data with timestamps or repeated entities — and resolve them before `GO`.
+
+Never create the split again later in the run to improve a number. `make_splits.py` refuses to overwrite an existing split with different settings; pass `--force` only when the split is genuinely wrong, and record why in the artifact.
 
 ### 6. Produce a target review brief
 
@@ -109,6 +129,13 @@ Decision: GO|NO-GO
 Confidence: high|medium|low
 ```
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- an `exec` block that re-creates the split into `"$(mktemp -d)"` with the same arguments and prints the per-split counts, entity overlap, and `test_keys_sha256` — proof that the split reproduces from the data and seed
+- for each `blocker`/`high` leakage risk: the computation that shows it (e.g. a crosstab of "column is filled in" against the label)
+
 ### JSON artifact
 
 Write `review-target.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
@@ -119,6 +146,7 @@ Key fields to populate:
 - `prediction_contract`: entity, prediction_time, target_event, horizon
 - `leakage_risks`: one entry per risk found
 - `primary_metric`, `promotion_threshold`, `split_strategy`
+- `split_manifest_path` and `test_keys_sha256` when the split was created
 - `findings`: one entry per leakage risk or blocker (severity mapped from the leakage review)
 
 ## Quick heuristics

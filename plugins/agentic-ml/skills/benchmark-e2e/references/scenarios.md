@@ -9,11 +9,11 @@ E-commerce fraud detection with compounding pitfalls that naive approaches consi
 Representative pitfalls:
 
 - **Target echo**: `chargeback_initiated_days_ago` is only non-null for fraud cases — perfect label leak
-- **Selection bias**: only 8% of transactions were manually reviewed; unreviewed non-fraud contains ~5% undetected fraud (mislabeled negatives)
+- **Selection bias**: only ~6% of transactions were manually reviewed; true fraud that was never reviewed is labeled `False` (3 of 60 fraud cases at the default seed) — the label is "confirmed fraud", not "fraud"
 - **Feedback loop**: `previous_model_risk_score` is output of the prior model — model learns to agree with its predecessor, not reality
 - **Extreme imbalance**: 0.3% fraud rate — AUROC is meaningless; requires AUPRC or precision@k
 - **Near-perfect feature leak**: `device_fingerprint_age_hours` < 2h is almost always fraud; value range reveals the label
-- **Concept drift**: fraud patterns shift monthly; random split leaks future signatures into training
+- **Time-based evaluation**: the model scores future transactions, so evaluate forward in time by `transaction_timestamp` (the generator does not simulate drift; a time split is still the correct protocol)
 - **Geographic proxy**: `ip_country` reflects data collection bias, not causal fraud signal
 
 Typical goal: maximize precision@k and AUPRC without leakage; enforce time-based split.
@@ -34,37 +34,39 @@ Benchmark configuration:
 
 Why it differentiates: AutoML and no-plugin approaches typically report 99.7% accuracy or misleading AUROC scores. Skills (`review-target`, `check-dataset-quality`, `explain-model`) catch the metric error, target echo, and concept drift requirement.
 
-## hard-attrition
+## hard-readmission
 
-Employee attrition prediction with label ambiguity, survivorship bias, and protected attribute pitfalls.
+Hospital 30-day readmission prediction with post-outcome leakage, censoring, and protected-attribute proxies.
 
 Representative pitfalls:
 
-- **Target echo**: `exit_survey_score` is 100% null for non-leavers — perfect oracle of the label
-- **Label ambiguity**: `left_company` conflates voluntary resignation, involuntary termination, and retirement — fundamentally different predictors
-- **Survivorship bias**: employees who left >2 years ago are excluded; long-tenured employees are overrepresented, inflating tenure coefficients
-- **Endogenous feature**: `performance_score_last_review` for managed-out employees reflects the termination decision, not prior performance
-- **Protected attribute proxies**: `salary` encodes gender/ethnicity pay gaps; `commute_distance_km` proxies zip/neighborhood
-- **High-cardinality manager proxy**: `manager_id` (80 managers) encodes culture/quality, not individual employee risk
-- **Multiple protected attributes**: gender (F attrition 24% vs M 18%), ethnicity, age (55+)
+- **Target echo**: `days_until_readmission` is non-null only for readmitted patients — perfect label leak
+- **Proxy leakage**: `discharge_notes_readmission_risk` is the clinician's own readmission-risk judgment at discharge — it partially encodes the outcome
+- **Censoring**: `died_before_30d` patients are labeled `False` but could not have been readmitted — they must be excluded, not treated as negatives
+- **Prediction-time ambiguity**: `discharge_to` is only known at discharge; whether it is a valid feature depends on whether the prediction is made at admission or at discharge (and `Hospice` almost never readmits)
+- **Label ambiguity**: planned readmissions (e.g. the next chemo cycle) and unplanned readmissions (complications) are conflated in one 30-day label
+- **Protected attribute proxies**: `insurance_type` is generated conditional on `race` and acts as a race/SES proxy
+- **High-cardinality physician proxy**: `attending_physician_id` (60 values) encodes physician-level variability, not patient risk
+- **Protected attributes with real outcome gaps**: `race` (readmission is generated with a race effect), `age`, `gender`
 
-Typical goal: define a precise, bias-safe target before modeling; surface pay discrimination before promotion.
+Typical goal: pin down prediction time and the label definition (exclude censored patients, separate planned readmissions) before modeling; surface proxy bias before promotion.
 
-Dataset: `demo/scenarios/hard-attrition/data.csv` (6,000 rows, generated)
+Dataset: `demo/scenarios/hard-readmission/data.csv` (4,000 rows, generated)
 
 ```bash
-uv run demo/scenarios/hard-attrition/generate_data.py
+uv run demo/scenarios/hard-readmission/generate_data.py
 ```
 
 Benchmark configuration:
 
 - Task type: binary classification
-- Primary metric: `f1` (macro, to surface class imbalance)
-- Label column: `left_company`
-- Entity column: `employee_id`
-- Protected attributes: `gender`, `ethnicity`, `age`
+- Primary metric: `auprc` (positive rate ~11%)
+- Label column: `readmitted_30d`
+- Entity column: `patient_id`
+- Timestamp column: none (use a stratified split on `readmitted_30d`)
+- Protected attributes: `race`, `age`, `gender`
 
-Why it differentiates: Without `review-target`, agents miss the label ambiguity and build a mixed voluntary/involuntary model. Without `explain-model`, the salary proxy discrimination is never surfaced. AutoML produces a model that encodes pay discrimination as signal.
+Why it differentiates: Without `review-target`, agents treat deceased patients as negatives and never ask when the prediction is made. Without `check-dataset-quality`, `days_until_readmission` goes straight into training. Without `explain-model`, the `insurance_type` race proxy is never surfaced.
 
 ## xhard-churn
 
@@ -83,7 +85,9 @@ Representative pitfalls:
 
 Typical goal: build a group-time-split churn model using `f1_macro`; surface composite interactions, label drift, and future-peeking features before training.
 
-Dataset: `demo/scenarios/xhard-churn/data.csv` (~7,000–8,000 rows after survivorship filtering, generated)
+Dataset: `demo/scenarios/xhard-churn/data.csv` (~6,400 rows after survivorship filtering — 6,366 at the default seed; generated)
+
+Known gap: at the default seed the composite leak is weak (univariate and pairwise AUC ≈ 0.54) and the Simpson's-paradox reversal does not hold in the large-company segment. Treat those two pitfalls as aspirational until the generator is reworked.
 
 ```bash
 uv run demo/scenarios/xhard-churn/generate_data.py
@@ -118,8 +122,8 @@ When `--scenario auto` is used, classify with this protocol:
 1) Inspect the dataset for the known scenario signatures (check in priority order):
    - `churned` label column AND `company_id` AND `snapshot_date` present → `xhard-churn`
    - `is_fraud` label column or `transaction_timestamp` present → `hard-fraud`
-   - `left_company` label column or `exit_survey_score` present → `hard-attrition`
+   - `readmitted_30d` label column or `days_until_readmission` present → `hard-readmission`
 
-2) If no signature matches, default to `hard-attrition` and explain why.
+2) If no signature matches, stop and ask the user which scenario to run (or to pass `--dataset` with `--label-col`) — do not guess.
 
-3) Output exactly one label: `hard-fraud`, `hard-attrition`, or `xhard-churn`.
+3) Output exactly one label: `hard-fraud`, `hard-readmission`, or `xhard-churn`.

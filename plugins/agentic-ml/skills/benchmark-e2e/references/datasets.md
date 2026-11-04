@@ -1,6 +1,13 @@
 # Dataset Catalog
 
-Benchmark datasets for E2E runs. Both datasets are generated locally from scripts in `demo/scenarios/` so results are reproducible across harnesses.
+Benchmark datasets for E2E runs. All datasets are generated locally from scripts in the repository's `demo/scenarios/` directory so results are reproducible across harnesses. Each generator writes `data.csv` next to itself by default (pass `--out PATH` to write elsewhere).
+
+The generators are part of the repository checkout, not the installed plugin. Clone [lawwu/agentic-ml-plugin](https://github.com/lawwu/agentic-ml-plugin) to use them.
+
+Two simpler scenarios are also available for demos and smoke tests (not used by `benchmark-e2e`):
+
+- `easy` — premium-upgrade prediction; clean data, no leakage (1,200 rows)
+- `medium` — telecom churn with a vague objective, a subtle temporal leak (`days_since_last_support_call`), and a mild protected-attribute gap (3,000 rows)
 
 ## hard-fraud — E-commerce Fraud Detection
 
@@ -15,7 +22,7 @@ uv run demo/scenarios/hard-fraud/generate_data.py
 |---|---|
 | Rows | 20,000 |
 | Label column | `is_fraud` |
-| Label rate | ~0.3% fraud |
+| Label rate | ~0.29% confirmed fraud (57 of 20,000 at the default seed) |
 | Entity column | `transaction_id` |
 | Timestamp column | `transaction_timestamp` |
 | Task type | binary classification |
@@ -30,7 +37,7 @@ Key columns and their role in the benchmark:
 | `chargeback_initiated_days_ago` | float (mostly null) | Target echo — null for all non-fraud |
 | `device_fingerprint_age_hours` | float | Near-perfect leak — <2h almost always fraud |
 | `previous_model_risk_score` | float | Feedback loop — prior model output |
-| `transaction_reviewed` | bool | Selection bias — only 8% reviewed |
+| `transaction_reviewed` | bool | Selection bias — only ~6% reviewed; unreviewed fraud is labeled `False` |
 | `ip_country` | categorical | Geographic proxy / collection bias |
 | `amount` | float | Bimodal (B2B + consumer); extreme outliers |
 
@@ -39,42 +46,43 @@ Benchmark notes:
 - Use a fixed seed (`rng=42`) and time-based split at 80/10/10 by `transaction_timestamp`
 - Expect naive AUROC ~0.97 that masks near-zero precision at low threshold
 
-## hard-attrition — Employee Attrition Prediction
+## hard-readmission — Hospital 30-Day Readmission
 
-Source: `demo/scenarios/hard-attrition/`
+Source: `demo/scenarios/hard-readmission/`
 
 ```bash
-uv run demo/scenarios/hard-attrition/generate_data.py
-# → demo/scenarios/hard-attrition/data.csv  (6,000 rows)
+uv run demo/scenarios/hard-readmission/generate_data.py
+# → demo/scenarios/hard-readmission/data.csv  (4,000 rows)
 ```
 
 | Property | Value |
 |---|---|
-| Rows | 6,000 |
-| Label column | `left_company` |
-| Label rate | ~20% attrition |
-| Entity column | `employee_id` |
+| Rows | 4,000 |
+| Label column | `readmitted_30d` |
+| Label rate | ~11% readmitted |
+| Entity column | `patient_id` |
 | Timestamp column | none (use stratified split) |
 | Task type | binary classification |
-| Primary metric | `f1` (macro) |
+| Primary metric | `auprc` |
 | Secondary metrics | `roc_auc`, disparate impact ratio per protected attribute |
-| Protected attributes | `gender`, `ethnicity`, `age` |
+| Protected attributes | `race`, `age`, `gender` |
 
 Key columns and their role in the benchmark:
 
 | Column | Type | Pitfall |
 |---|---|---|
-| `exit_survey_score` | float (null for stayers) | Target echo — 100% null for non-leavers |
-| `performance_score_last_review` | int | Endogenous — reflects termination decision |
-| `salary` | float | Proxy — encodes gender/ethnicity pay gaps |
-| `manager_id` | categorical (80 values) | High-cardinality manager proxy |
-| `commute_distance_km` | float | Proxy — correlates with zip/SES |
+| `days_until_readmission` | float (null unless readmitted) | Target echo — non-null only for positives |
+| `discharge_notes_readmission_risk` | float | Proxy leakage — clinician's own outcome judgment |
+| `died_before_30d` | bool | Censoring — deceased patients labeled `False`; must be excluded |
+| `discharge_to` | categorical | Prediction-time ambiguity — known only at discharge |
+| `insurance_type` | categorical | Proxy — generated conditional on `race` |
+| `attending_physician_id` | categorical (60 values) | High-cardinality physician proxy |
 
 Benchmark notes:
 
-- Use stratified split (stratify on `left_company`) with fixed seed
-- Expect `exit_survey_score` to appear as top feature with near-100% importance — automatic blocker in `explain-model`
-- Disparate impact on `gender` and `ethnicity` expected to fail threshold (<0.8)
+- Use stratified split (stratify on `readmitted_30d`) with fixed seed
+- Expect `days_until_readmission` to be flagged as a blocker by `check-dataset-quality` and to dominate importance if it reaches training
+- Expect the `insurance_type` → `race` proxy to surface in the `explain-model` bias audit
 
 ## xhard-churn — B2B SaaS Customer Churn
 
@@ -82,12 +90,12 @@ Source: `demo/scenarios/xhard-churn/`
 
 ```bash
 uv run demo/scenarios/xhard-churn/generate_data.py
-# → demo/scenarios/xhard-churn/data.csv  (~7,000–8,000 rows after survivorship filtering)
+# → demo/scenarios/xhard-churn/data.csv  (~6,400 rows after survivorship filtering)
 ```
 
 | Property | Value |
 |---|---|
-| Rows | ~7,000–8,000 (varies due to survivorship filtering) |
+| Rows | ~6,400 (6,366 at the default seed; varies with survivorship filtering) |
 | Label column | `churned` |
 | Label rate | ~20–27% churn (drifts across snapshots) |
 | Entity column | `company_id` |

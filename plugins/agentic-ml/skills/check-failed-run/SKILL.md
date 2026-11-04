@@ -1,7 +1,7 @@
 ---
 name: check-failed-run
 description: Diagnoses failed or unstable machine learning training runs across local logs, artifact directories, process targets, experiment trackers, and Vertex AI pipelines. Collects evidence, classifies failure mode, performs root-cause analysis, and delivers a prioritized recovery plan. Run this automatically whenever a training job exits with an error, produces suspicious metrics, or is handed off for post-mortem review.
-argument-hint: "[log-file | artifact-dir | --traceback | --pid PID | --proc NAME | --wandb RUN | --mlflow RUN | --vertex-pipeline JOB] [--project PROJECT] [--region REGION] [--framework pytorch|lightning|deepspeed|fsdp|tensorflow|jax] [--task classification|regression|language-modeling] [--last N]"
+argument-hint: "[log-file | artifact-dir | --traceback | --pid PID | --proc NAME | --wandb RUN | --mlflow RUN | --vertex-pipeline JOB] [--project PROJECT] [--region REGION] [--framework pytorch|lightning|deepspeed|fsdp|tensorflow|jax] [--task classification|regression|language-modeling] [--last N] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
 # Check Failed Run
@@ -35,6 +35,13 @@ Optional flags:
 
 Target: `$ARGUMENTS`
 
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: explain the root cause in plain terms next to the log lines that prove it.
+- `staff`: go straight to the ranked fixes.
+
 ## Your responsibilities
 
 ### 1. Collect evidence before proposing fixes
@@ -61,7 +68,7 @@ For artifact directories, collect:
 - Checkpoint inventory and timestamps
 - Any failure artifacts (`stderr`, crash dumps, task metadata)
 
-For remote logs, use [scripts/fetch-remote-log.sh](scripts/fetch-remote-log.sh) to fetch the log and companion config files in one step.
+For remote logs, use [`"${CLAUDE_SKILL_DIR}/scripts/fetch-remote-log.sh"`](scripts/fetch-remote-log.sh) to fetch the log and companion config files in one step.
 
 If evidence is missing, request the smallest additional artifact needed.
 
@@ -168,6 +175,13 @@ Stop when one of these is true:
 - User decision is required for medium/high-risk changes
 - Available evidence is insufficient and the required artifact request is explicit
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- for each evidence item: an `exec` block that shows the log lines (`grep -n ... | head`) or metrics behind it, run on the saved log (copy remote logs into `<out-dir>` first)
+- a note with the root cause and the ranked fixes
+
 ### JSON artifact
 
 Write `check-failed-run.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
@@ -195,7 +209,7 @@ Key fields to populate:
 ## Example
 
 ```text
-/ml-skills:check-failed-run ./logs/train.log --framework pytorch --task language-modeling
+/agentic-ml:check-failed-run ./logs/train.log --framework pytorch --task language-modeling
 
 Status: crashed
 Framework: PyTorch
@@ -215,7 +229,7 @@ Next command(s):
 ```
 
 ```text
-/ml-skills:check-failed-run --vertex-pipeline 1234567890 --project my-proj --region us-central1
+/agentic-ml:check-failed-run --vertex-pipeline 1234567890 --project my-proj --region us-central1
 
 Status: crashed
 Framework: Vertex AI Pipeline component (trainer)

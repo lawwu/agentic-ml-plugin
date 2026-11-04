@@ -1,7 +1,7 @@
 ---
 name: benchmark-e2e
-description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (hard-fraud, hard-attrition, or xhard-churn) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
-argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|hard-fraud|hard-attrition|xhard-churn] [--dataset PATH] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
+description: Benchmarks end-to-end ML execution quality across multiple modes (no-plugin/manual, plugin-driven, and AutoGluon-backed AutoML). Automatically identifies exactly one dataset scenario (hard-fraud, hard-readmission, or xhard-churn) and runs the benchmark against that single scenario. Use when asked to compare E2E workflows, measure agent reliability/cost/speed, or recommend which skills should be used for the detected scenario.
+argument-hint: "[--modes no-plugin,plugin,automl|autogluon] [--scenario auto|hard-fraud|hard-readmission|xhard-churn] [--dataset PATH] [--label-col COLUMN] [--metric METRIC] [--runs N] [--out-dir DIR]"
 disable-model-invocation: true
 ---
 
@@ -14,7 +14,7 @@ Run a structured benchmark of end-to-end ML execution paths and produce a compar
 Arguments (`$ARGUMENTS`) are interpreted as:
 
 - `--modes` — benchmark targets; default: `no-plugin,plugin,automl` (where `automl` maps to AutoGluon; `autogluon` alias accepted)
-- `--scenario` — `auto` (default), `hard-fraud`, or `hard-attrition`
+- `--scenario` — `auto` (default), `hard-fraud`, `hard-readmission`, or `xhard-churn`
 - `--dataset` — dataset path/ID (required unless scenario specifies source)
 - `--label-col` — target column
 - `--metric` — primary metric for quality scoring
@@ -29,12 +29,12 @@ Target: `$ARGUMENTS`
 
 Determine one scenario before benchmarking:
 
-- If `--scenario hard-fraud`, `--scenario hard-attrition`, or `--scenario xhard-churn` is passed, use it.
+- If `--scenario hard-fraud`, `--scenario hard-readmission`, or `--scenario xhard-churn` is passed, use it.
 - Otherwise (`--scenario auto` or omitted), classify automatically using [references/scenarios.md](references/scenarios.md).
-- You must select exactly one scenario: `hard-fraud`, `hard-attrition`, or `xhard-churn`.
-- Never run both scenarios in one invocation.
+- You must select exactly one scenario: `hard-fraud`, `hard-readmission`, or `xhard-churn`.
+- Never run more than one scenario in one invocation.
 
-If classification is ambiguous, default to `hard-attrition` and explain why.
+If classification is ambiguous, ask the user which scenario to run (or to pass `--dataset` with `--label-col`) instead of guessing.
 
 ### 2. Define benchmark matrix (single scenario)
 
@@ -43,7 +43,7 @@ Build only:
 - Modes: requested subset of `no-plugin`, `plugin`, `automl` (AutoGluon)
 - Scenario: the one selected in step 1
 
-Generate the dataset from `demo/scenarios/<scenario>/generate_data.py` when no `--dataset` path is provided. See [references/datasets.md](references/datasets.md) for generation commands and benchmark configuration.
+Generate the dataset from `demo/scenarios/<scenario>/generate_data.py` when no `--dataset` path is provided. The scenario generators live in the [agentic-ml-plugin repository](https://github.com/lawwu/agentic-ml-plugin) under `demo/scenarios/` and are **not** shipped with the installed plugin — if `demo/scenarios/` is not in the working directory, ask the user to clone the repository or pass `--dataset`. See [references/datasets.md](references/datasets.md) for generation commands and benchmark configuration.
 
 Document any assumptions.
 
@@ -101,12 +101,12 @@ Create:
 - mode ranking for the selected scenario
 - recommendation: best default mode + fallback mode
 
-Use [scripts/init-report.sh](scripts/init-report.sh) to initialize report files.
+Use [`bash "${CLAUDE_SKILL_DIR}/scripts/init-report.sh" <out-dir>`](scripts/init-report.sh) to initialize report files.
 
 After writing `benchmark-report.json`, generate the HTML report:
 
 ```bash
-uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir>
+uv run "${CLAUDE_SKILL_DIR}/scripts/generate_benchmark_report.py" <run-dir>
 # → <run-dir>/benchmark-report.html
 ```
 
@@ -118,7 +118,7 @@ The HTML report is a self-contained scorecard with the results table, stage cove
 E2E Benchmark Report
 ====================
 Matrix: <modes x 1 scenario>
-Selected scenario: <hard-fraud|hard-attrition|xhard-churn> (detection: <auto|user-forced>)
+Selected scenario: <hard-fraud|hard-readmission|xhard-churn> (detection: <auto|user-forced>)
 Runs per cell: <N>
 Primary metric: <metric>
 
@@ -131,9 +131,9 @@ Stage coverage:
 | Stage | no-plugin | plugin | automl |
 |---|---|---|---|
 | 1. Target readiness | GO/NO-GO/SKIPPED | GO/NO-GO/SKIPPED | GO/NO-GO/SKIPPED |
-| 2. Experiment plan | ... | ... | ... |
+| 2. Dataset quality | ... | ... | ... |
 | 3. Non-ML baseline | ... | ... | ... |
-| 4. Dataset quality | ... | ... | ... |
+| 4. Experiment plan | ... | ... | ... |
 | 5. Data pipeline | ... | ... | ... |
 | 6. Training stability | ... | ... | ... |
 | 7. Evaluation quality | ... | ... | ... |
@@ -165,7 +165,7 @@ Write `benchmark-report.json` to `--out-dir` (default: `./reports/e2e-benchmark`
 Then immediately generate the HTML report:
 
 ```bash
-uv run plugins/agentic-ml/skills/benchmark-e2e/scripts/generate_benchmark_report.py <run-dir>
+uv run "${CLAUDE_SKILL_DIR}/scripts/generate_benchmark_report.py" <run-dir>
 ```
 
 Both `benchmark-report.json` and `benchmark-report.html` must be present for the benchmark to be considered complete.

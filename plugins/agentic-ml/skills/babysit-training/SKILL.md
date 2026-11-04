@@ -1,10 +1,10 @@
 ---
 name: babysit-training
 description: Continuously monitors a machine learning training run (local, remote, or cloud) until it completes or hits a critical issue. Supports local log files, SSH targets, process names, Vertex AI Pipeline jobs, and Vertex AI Custom training jobs. Run this automatically whenever a training job is started or handed off — poll for anomalies, report progress, and escalate issues without waiting to be asked.
-argument-hint: "[log-file | user@host:path | --pid PID | --proc NAME | --vertex-pipeline JOB | --vertex-training JOB] [--project PROJECT] [--region REGION] [--interval SECONDS]"
+argument-hint: "[log-file | user@host:path | --pid PID | --proc NAME | --vertex-pipeline JOB | --vertex-training JOB] [--project PROJECT] [--region REGION] [--interval SECONDS] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
-# Check Training
+# Babysit Training
 
 Monitor a machine learning training run and maintain session control until it reaches a terminal state.
 
@@ -31,6 +31,13 @@ Optional flags:
 - `--no-fix` — observe only, never attempt fixes
 
 Target: $ARGUMENTS
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: explain each anomaly when it appears and what usually causes it.
+- `staff`: report only anomalies and the terminal state.
 
 ## Your responsibilities
 
@@ -198,6 +205,13 @@ Confidence: high|medium|low
 `GO`: training reached a terminal `SUCCEEDED` state with no unresolved critical anomalies.
 `NO-GO`: terminal state is `FAILED`, `CANCELLED`, or `TIMEOUT` with unresolved blockers.
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- a note summarizing the monitoring timeline: anomalies, actions taken, terminal state, and when
+- after the run ends, `exec` blocks on the finished log — the last progress line, and `grep -c` counts of NaN/OOM/error lines. The log no longer changes, so these reproduce. Copy remote logs into `<out-dir>` first
+
 ### JSON artifact
 
 Write `babysit-training.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
@@ -214,7 +228,7 @@ Key fields to populate:
 **Local/remote training (with exponential backoff):**
 
 ```
-/ml-skills:babysit-training user@gpu-box:~/runs/gpt2-finetune/train.log --interval 30
+/agentic-ml:babysit-training user@gpu-box:~/runs/gpt2-finetune/train.log --interval 30
 
 [10:03:00] Connecting to gpu-box...
 [10:03:01] Process found: PID 48291 (torchrun, 4 GPUs)
@@ -236,7 +250,7 @@ Key fields to populate:
 **Vertex AI Pipeline:**
 
 ```
-/ml-skills:babysit-training --vertex-pipeline my-llm-pipeline --project my-gcp-proj --interval 120
+/agentic-ml:babysit-training --vertex-pipeline my-llm-pipeline --project my-gcp-proj --interval 120
 
 [10:00:00] Pipeline: my-llm-pipeline
   Job: projects/my-gcp-proj/locations/us-central1/pipelineJobs/1234567890
@@ -254,7 +268,7 @@ Key fields to populate:
 **Vertex AI Custom training job:**
 
 ```
-/ml-skills:babysit-training --vertex-training 9876543210 --project my-gcp-proj
+/agentic-ml:babysit-training --vertex-training 9876543210 --project my-gcp-proj
 
 [10:00:00] Custom job: projects/my-gcp-proj/locations/us-central1/customJobs/9876543210
   State: RUNNING | Machine: n1-standard-8 + 2x NVIDIA_TESLA_V100

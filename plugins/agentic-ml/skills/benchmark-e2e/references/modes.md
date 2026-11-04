@@ -4,19 +4,19 @@ Use consistent execution definitions so benchmark cells are comparable.
 
 ## Shared lifecycle framework
 
-Every mode must attempt the same 9 lifecycle stages in order, regardless of mode. This is what makes cells comparable. Record each stage's outcome — do not skip stages for any reason other than an upstream hard dependency (e.g., skip stage 6 if no training run was produced by stage 2/3/4/5).
+Every mode must attempt the same 9 lifecycle stages in order, regardless of mode. This is what makes cells comparable. Record each stage's outcome — do not skip stages for any reason other than an upstream hard dependency (e.g., skip stage 7 if stage 6 produced no trained model).
 
 | Stage | Lifecycle gate | `no-plugin` activity | `plugin` activity | `automl` activity |
 |---|---|---|---|---|
 | 1 | Target readiness | Manual target framing and metric definition | `review-target` | Define target/task in code |
-| 2 | Experiment plan | Manual model selection and HP search plan | `plan-experiment` | AutoGluon hyperparameter space (automatic) |
+| 2 | Dataset quality | Manual dataset checks and EDA | `check-dataset-quality` | Manual schema/label inspection |
 | 3 | Non-ML baseline | Manual heuristic baseline | `build-baseline` | Manual heuristic baseline |
-| 4 | Dataset quality | Manual dataset checks and EDA | `check-dataset-quality` | Manual schema/label inspection |
+| 4 | Experiment plan | Manual model selection and HP search plan | `plan-experiment` | AutoGluon hyperparameter space (automatic) |
 | 5 | Data pipeline | Manual preprocessing sanity checks | `check-data-pipeline` | AutoGluon pipeline dry-run |
 | 6 | Training stability | Manual training run and log monitoring | `train-model` (+ `babysit-training` + `check-failed-run` on failure) | AutoGluon `fit()` with runtime logging |
 | 7 | Evaluation quality | Manual metric computation and baseline comparison | `check-eval` | AutoGluon leaderboard + holdout metrics |
 | 8 | Interpretability/bias | Manual feature importance and bias review | `explain-model` | AutoGluon feature importance + bias check |
-| 9 | Promotion decision | Manual summary decision | Final `GO`/`NO-GO` from `orchestrate-e2e` | Deployment-readiness recommendation |
+| 9 | Promotion decision | Manual summary decision | Final `GO`/`NO-GO` recorded from stage results | Deployment-readiness recommendation |
 
 **A NO-GO at any stage does not halt the benchmark.** Record the NO-GO decision and continue measuring remaining stages. The benchmark needs full coverage to score reliability; stopping early would make scores incomparable across modes.
 
@@ -64,11 +64,12 @@ AutoML path implemented with AutoGluon. Do not invoke any skills in this mode.
 
 Map AutoGluon's outputs to each of the 9 stages:
 
-- Stages 1–5: perform manually before calling `fit()`; document what was checked
-- Stage 5: `TabularPredictor.fit()` (or `MultiModalPredictor` as applicable); capture fit summary and training logs
-- Stage 6: extract AutoGluon leaderboard + holdout metrics; compare against baseline
-- Stage 7: `predictor.feature_importance()` + manual bias check on protected attributes
-- Stage 8: produce deployment-readiness recommendation from AutoGluon artifacts
+- Stages 1–4: perform manually before calling `fit()`; document what was checked
+- Stage 5: AutoGluon pipeline dry-run (e.g. `fit()` on a small sample with a short `time_limit`); confirm feature types and label handling
+- Stage 6: `TabularPredictor.fit()` (or `MultiModalPredictor` as applicable); capture fit summary and training logs
+- Stage 7: extract AutoGluon leaderboard + holdout metrics; compare against baseline
+- Stage 8: `predictor.feature_importance()` + manual bias check on protected attributes
+- Stage 9: produce deployment-readiness recommendation from AutoGluon artifacts
 
 Execution requirements:
 

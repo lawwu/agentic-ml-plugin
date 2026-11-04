@@ -1,7 +1,7 @@
 ---
 name: explain-model
 description: Generates feature importance, bias audit, and model card before promotion. Invoke automatically after evaluation completes — even if the user says "looks good, let's ship it" or "ready to deploy." Deploying without interpretability review risks hidden biases, spurious correlations, and regulatory exposure. Also invoke when a user asks about model behavior, feature contributions, fairness, or wants to document a model.
-argument-hint: "[checkpoint-path | model-path | hf-model] [--data PATH] [--label-col COLUMN] [--protected-attrs A1,A2] [--method shap|permutation|builtin|auto] [--out-dir DIR]"
+argument-hint: "[checkpoint-path | model-path | hf-model] [--data PATH] [--label-col COLUMN] [--protected-attrs A1,A2] [--method shap|permutation|builtin|auto] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
@@ -22,6 +22,13 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 
 Target: `$ARGUMENTS`
 
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: explain each fairness metric in one sentence.
+- `staff`: frame fairness findings as policy decisions that need a named owner.
+
 ## Your responsibilities
 
 ### 1. Compute feature importance
@@ -36,13 +43,15 @@ Select method using [references/interpretability-methods.md](references/interpre
 Run [scripts/feature_importance.py](scripts/feature_importance.py) to standardize output:
 
 ```bash
-uv run scripts/feature_importance.py \
+uv run "${CLAUDE_SKILL_DIR}/scripts/feature_importance.py" \
   --model <path> \
   --data <path> \
   --label-col <col> \
   --method <method> \
   --out-dir <dir>
 ```
+
+The script declares its own dependencies (pandas, numpy, scikit-learn, shap, joblib). If the model was saved with another library, add it so the model can be unpickled — for example `uv run --with lightgbm "${CLAUDE_SKILL_DIR}/scripts/feature_importance.py" ...` (or `--with xgboost`, `--with catboost`).
 
 Report top-20 features with importance scores and ranks.
 
@@ -66,10 +75,10 @@ For each protected attribute, compute:
 | Metric | Formula | Threshold |
 |--------|---------|-----------|
 | Disparate impact ratio | min_group_rate / max_group_rate | < 0.8 → blocker |
-| Equalized odds (TPR parity) | max TPR gap across groups | > 0.1 → warning |
-| Predictive parity | max PPV gap across groups | > 0.1 → warning |
+| Equalized odds (TPR parity) | max TPR gap across groups | > 0.1 → high |
+| Predictive parity | max PPV gap across groups | > 0.1 → high |
 
-Flag any metric that triggers a blocker or warning.
+Flag any metric that triggers a `blocker` or `high` severity.
 
 ### 4. Surface unexpected learned patterns
 
@@ -140,7 +149,7 @@ Bias / Fairness Audit:
 | <attr>    | disparate impact     | <val> | ≥ 0.8     | PASS/FAIL |
 
 Unexpected Patterns:
-1) <pattern> | severity=<blocker|warning|info> | action=<...>
+1) <pattern> | severity=<blocker|high|medium|low> | action=<...>
 
 Model card: <out-dir>/MODEL_CARD.md
 
@@ -150,17 +159,25 @@ Caveats:
 - <caveat 1>
 ```
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- top features: `exec` the importance script when it runs in under about a minute (it is seeded); otherwise print the top features from its output file, with the file's sha256
+- each bias-audit metric that triggers `blocker` or `high`: the computation (rates by group from the predictions file)
+- each unexpected pattern flagged (e.g. a single feature with over 50% of the importance)
+
 ### JSON artifact
 
 Write `explain-model.json` to `--out-dir` (or `./explain_output/` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
 
 Key fields to populate:
 
-- `decision`: `GO` / `CONDITIONAL` / `NO-GO` (maps from old PROMOTE / PROMOTE-WITH-CAVEATS / DO-NOT-PROMOTE)
+- `decision`: `GO` / `CONDITIONAL` / `NO-GO`
 - `top_features`, `pdp_summary`, `bias_audit`, `unexpected_patterns`
 - `caveats`: list all caveats when `decision` is `CONDITIONAL`
 - `model_card_path`: absolute path to `MODEL_CARD.md`
-- `findings`: one entry per blocker or warning found in bias audit and unexpected patterns
+- `findings`: one entry per `blocker` or `high` issue found in the bias audit and unexpected patterns
 
 ## Quick heuristics
 
@@ -176,7 +193,7 @@ Key fields to populate:
 Stop when:
 
 - explainability report and model card are complete with a promotion decision, or
-- a DO-NOT-PROMOTE blocker is found and reported — do not auto-proceed to promotion.
+- a `NO-GO` blocker is found and reported — do not auto-proceed to promotion.
 
 ## Additional resources
 

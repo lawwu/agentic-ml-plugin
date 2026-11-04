@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Run Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --go: #16a34a; --go-bg: #dcfce7; --go-border: #86efac;
+    --nogo: #dc2626; --nogo-bg: #fee2e2; --nogo-border: #fca5a5;
+    --cond: #d97706; --cond-bg: #fef3c7; --cond-border: #fcd34d;
+    --pass: #16a34a; --fail: #dc2626; --skipped: #9ca3af; --pending: #6b7280;
+    --blocker: #dc2626; --high: #ea580c; --medium: #d97706; --low: #6b7280;
+    --bg: #f9fafb; --card: #ffffff; --border: #e5e7eb; --text: #111827;
+    --muted: #6b7280; --code-bg: #f3f4f6;
+  }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  header { background: #1e293b; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; font-weight: 600; flex: 1; min-width: 200px; }
+  .run-meta { font-size: 12px; color: #94a3b8; }
+  .badge { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 9999px; font-weight: 700; font-size: 13px; border: 2px solid; }
+  .badge-GO    { color: var(--go);   background: var(--go-bg);   border-color: var(--go-border); }
+  .badge-NOGO  { color: var(--nogo); background: var(--nogo-bg); border-color: var(--nogo-border); }
+  .badge-CONDITIONAL { color: var(--cond); background: var(--cond-bg); border-color: var(--cond-border); }
+  .badge-PENDING { color: var(--pending); background: #f3f4f6; border-color: #d1d5db; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  section h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+
+  /* Gate timeline */
+  .gate-timeline { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding-bottom: 8px; }
+  .gate-item { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 90px; position: relative; }
+  .gate-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 18px; left: 55%; width: 90%; height: 2px;
+    background: var(--border); z-index: 0;
+  }
+  .gate-circle {
+    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 700; z-index: 1;
+    border: 2px solid; cursor: pointer; transition: transform 0.15s;
+  }
+  .gate-circle:hover { transform: scale(1.1); }
+  .gate-circle.PASS    { background: var(--go-bg);   color: var(--go);   border-color: var(--go); }
+  .gate-circle.FAIL    { background: var(--nogo-bg); color: var(--nogo); border-color: var(--nogo); }
+  .gate-circle.SKIPPED { background: #f3f4f6; color: var(--skipped); border-color: var(--skipped); }
+  .gate-circle.PENDING { background: #f3f4f6; color: var(--pending);  border-color: var(--pending); }
+  .gate-circle.PASS.conditional { background: var(--cond-bg); color: var(--cond); border-color: var(--cond); border-style: dashed; }
+  .gate-status { font-size: 10px; font-weight: 700; margin-top: 2px; white-space: nowrap; }
+  .gate-status.PASS { color: var(--go); } .gate-status.FAIL { color: var(--nogo); }
+  .gate-status.SKIPPED { color: var(--skipped); } .gate-status.PENDING { color: var(--pending); }
+  .gate-status.conditional { color: var(--cond); }
+  .load-error { color: var(--nogo); font-weight: 600; font-size: 13px; margin-bottom: 10px; }
+  .prov-table td:first-child { white-space: nowrap; color: var(--muted); width: 1%; }
+  .prov-table code, .mono { font-family: monospace; font-size: 12px; word-break: break-all; }
+  .gate-label { font-size: 11px; text-align: center; margin-top: 6px; color: var(--muted); max-width: 88px; word-break: break-word; }
+  .gate-decision-badge { font-size: 10px; font-weight: 600; margin-top: 2px; }
+
+  /* Summary panel */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .summary-kv { background: var(--code-bg); border-radius: 6px; padding: 10px 14px; }
+  .summary-kv .key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-kv .val { font-size: 14px; font-weight: 600; margin-top: 2px; word-break: break-word; }
+
+  /* Skill cards */
+  .skill-cards { display: flex; flex-direction: column; gap: 12px; }
+  .skill-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .skill-card-header {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    cursor: pointer; user-select: none; background: var(--code-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .skill-card-header:hover { background: #e9eaf0; }
+  .skill-card-header h3 { flex: 1; font-size: 14px; font-weight: 600; font-family: monospace; }
+  .skill-card-header .duration { font-size: 12px; color: var(--muted); }
+  .chevron { transition: transform 0.2s; font-size: 12px; color: var(--muted); }
+  .skill-card-header.open .chevron { transform: rotate(180deg); }
+  .skill-card-body { padding: 16px; display: none; }
+  .skill-card-body.open { display: block; }
+
+  /* Findings table */
+  .findings-table, .results-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .findings-table th, .results-table th { text-align: left; font-weight: 600; padding: 6px 10px; background: var(--code-bg); border-bottom: 2px solid var(--border); }
+  .findings-table td, .results-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .findings-table tr:last-child td, .results-table tr:last-child td { border-bottom: none; }
+  .sev-blocker { color: var(--blocker); font-weight: 700; }
+  .sev-high    { color: var(--high);    font-weight: 600; }
+  .sev-medium  { color: var(--medium);  font-weight: 600; }
+  .sev-low     { color: var(--low); }
+
+  /* Next commands */
+  .next-cmds { margin-top: 12px; }
+  .next-cmds h4 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .cmd-block { background: #1e293b; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .copy-btn { cursor: pointer; background: #334155; border: none; color: #94a3b8; border-radius: 4px; padding: 2px 8px; font-size: 11px; flex-shrink: 0; }
+  .copy-btn:hover { background: #475569; color: white; }
+
+  /* Raw JSON tab */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .tab { padding: 6px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--muted); }
+  .tab.active { color: var(--text); border-bottom-color: #1e293b; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  pre.json { background: #1e293b; color: #e2e8f0; font-size: 12px; padding: 12px; border-radius: 6px; overflow: auto; max-height: 400px; white-space: pre-wrap; word-break: break-all; }
+
+  /* Data tables */
+  .data-section { margin-top: 14px; }
+  .data-section h4 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+  /* Blockers/risks */
+  .blockers-list { list-style: none; }
+  .blockers-list li { padding: 6px 10px; border-left: 3px solid var(--nogo); background: var(--nogo-bg); margin-bottom: 4px; border-radius: 0 4px 4px 0; font-size: 13px; }
+  .risks-list li { border-left-color: var(--cond); background: var(--cond-bg); }
+
+  /* Empty state */
+  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+
+  /* Positive delta */
+  .delta-pos { color: var(--go); }
+  .delta-neg { color: var(--nogo); }
+
+  /* Chips, tags, strips */
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; border: 1px solid; margin: 0 6px 6px 0; }
+  .chip.pass { color: var(--go); background: var(--go-bg); border-color: var(--go-border); }
+  .chip.fail { color: var(--nogo); background: var(--nogo-bg); border-color: var(--nogo-border); }
+  .chip.unknown { color: var(--pending); background: #f3f4f6; border-color: #d1d5db; }
+  .chip .detail { font-weight: 400; color: var(--text); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; background: var(--code-bg); color: var(--muted); border: 1px solid var(--border); margin-left: 6px; white-space: nowrap; }
+  .tag.non-ml { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+  .tag.statistical { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+  .tag.foundation-model { background: #fce7f3; color: #be185d; border-color: #f9a8d4; }
+  .tag.fit-high { background: var(--go-bg); color: var(--go); border-color: var(--go-border); }
+  .tag.fit-medium { background: var(--cond-bg); color: var(--cond); border-color: var(--cond-border); }
+  .tag.fit-low { background: #f3f4f6; color: var(--muted); }
+  .tag.level { background: #1e293b; color: #e2e8f0; border-color: #1e293b; }
+  .run-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .run-strip .strip-item { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; }
+  .run-strip .strip-item .k { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .05em; margin-right: 6px; }
+  .proto-line { font-size: 13px; padding: 6px 10px; border-radius: 6px; background: var(--code-bg); margin-top: 8px; }
+  .proto-line.bad { background: var(--nogo-bg); color: var(--nogo); font-weight: 600; }
+  .proto-line.warn { background: var(--cond-bg); color: var(--cond); }
+  tr.flagged td { background: var(--nogo-bg); }
+  .pts-1 { color: var(--go); font-weight: 700; } .pts-half { color: var(--cond); font-weight: 700; } .pts-0 { color: var(--nogo); font-weight: 700; }
+  .score-tiles { display: flex; gap: 10px; flex-wrap: wrap; }
+  .score-tile { background: var(--code-bg); border-radius: 6px; padding: 8px 14px; min-width: 110px; }
+  .score-tile .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .score-tile .v { font-size: 20px; font-weight: 700; }
+  .score-tile.final { background: #1e293b; color: #e2e8f0; }
+  .score-tile.final .k { color: #94a3b8; }
+  details.items { margin-top: 12px; }
+  details.items summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .gate-circle.info { background: #fff; color: var(--muted); border-color: var(--border); border-style: dashed; }
+
+  /* Evidence notebook */
+  .ev-status { margin-bottom: 12px; }
+  .ev-title { font-size: 14px; font-weight: 600; margin: 4px 0 10px; }
+  details.ev-sec { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+  details.ev-sec > summary { cursor: pointer; padding: 8px 12px; font-weight: 600; font-size: 13px; background: var(--code-bg); border-radius: 6px; }
+  details.ev-sec > summary .count { font-weight: 400; color: var(--muted); margin-left: 8px; }
+  details.ev-sec.highlight { box-shadow: 0 0 0 2px #1e293b; }
+  .ev-body { padding: 10px 12px; }
+  .ev-note { white-space: pre-wrap; font-size: 13px; margin: 6px 0; word-break: break-word; }
+  .ev-block { margin: 8px 0; }
+  .ev-lang { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 4px 0 2px; }
+  pre.ev-code, pre.ev-out, pre.ev-verify { font-size: 12px; padding: 8px 10px; border-radius: 6px; overflow: auto; max-height: 360px; white-space: pre-wrap; word-break: break-all; }
+  pre.ev-code { background: #1e293b; color: #e2e8f0; }
+  pre.ev-out { background: var(--code-bg); color: var(--text); border: 1px solid var(--border); }
+  pre.ev-verify { background: var(--nogo-bg); color: #7f1d1d; border: 1px solid var(--nogo-border); margin-top: 8px; }
+  .ev-link { cursor: pointer; background: none; border: 1px solid var(--border); border-radius: 9999px; padding: 1px 8px; font-size: 11px; color: var(--muted); }
+  .ev-link:hover { color: var(--text); border-color: var(--text); }
+  .ev-ref { font-size: 12px; margin-bottom: 4px; word-break: break-word; }
+  .ev-ref a { color: inherit; cursor: pointer; text-decoration: underline dotted; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+    <h1 id="header-title">ML Run Report</h1>
+    <div class="run-meta" id="header-meta"></div>
+  </div>
+  <div id="header-badge"></div>
+</header>
+
+<main>
+  <!-- Gate Timeline -->
+  <section>
+    <h2>Gate Timeline</h2>
+    <div class="gate-timeline" id="gate-timeline"></div>
+  </section>
+
+  <!-- Summary Panel -->
+  <section>
+    <h2>Run Summary</h2>
+    <div class="run-strip" id="run-strip"></div>
+    <div class="summary-grid" id="summary-grid"></div>
+    <div id="blockers-risks" style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;"></div>
+  </section>
+
+  <!-- ML Test Score (only when run-summary.json carries ml_test_score) -->
+  <section id="mlts-section" hidden>
+    <h2>ML Test Score</h2>
+    <div id="mlts"></div>
+  </section>
+
+  <!-- Per-skill cards -->
+  <section>
+    <h2>Skill Reports</h2>
+    <div class="skill-cards" id="skill-cards"></div>
+  </section>
+
+  <!-- Evidence notebook (evidence.md + evidence-verify.txt) -->
+  <section id="evidence-section" hidden>
+    <h2>Evidence</h2>
+    <div id="evidence"></div>
+  </section>
+</main>
+
+<script>
+// ── Embedded data (injected by generate_report.py) ─────────────────────────
+const EMBEDDED_DATA = null;
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+// Every value taken from an artifact must pass through esc()/fmtVal()/fmtNum()
+// before it is interpolated into HTML.
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function arr(v) { return Array.isArray(v) ? v : []; }
+function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
+
+function safeStringify(v) {
+  try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); }
+}
+
+function toNum(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
+// Fixed-decimal number; non-numeric values are shown (escaped) as-is.
+function fmtNum(v, digits) {
+  if (v == null || v === '') return '';
+  const n = toNum(v);
+  return n == null ? esc(v) : esc(n.toFixed(digits));
+}
+
+function fmtInt(v) {
+  const n = toNum(v);
+  return n == null ? esc(v ?? '') : esc(n.toLocaleString());
+}
+
+function fmtVal(v) {
+  if (v == null) return '';
+  if (typeof v === 'object') return esc(JSON.stringify(v));
+  return esc(v);
+}
+
+function isEmpty(v) {
+  return v == null || v === '' || (Array.isArray(v) && !v.length) ||
+    (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+}
+
+const DECISION_CLASS = { 'GO': 'badge-GO', 'NO-GO': 'badge-NOGO', 'CONDITIONAL': 'badge-CONDITIONAL' };
+function decisionClass(d) { return DECISION_CLASS[d] || 'badge-PENDING'; }
+function badge(d) { return `<span class="badge ${decisionClass(d)}">${esc(d)}</span>`; }
+
+const SEVERITIES = ['blocker', 'high', 'medium', 'low'];
+function severityClass(s) { return 'sev-' + (SEVERITIES.includes(s) ? s : 'low'); }
+
+const GATE_STATUSES = ['PASS', 'FAIL', 'SKIPPED', 'PENDING'];
+function gateStatus(s) { return GATE_STATUSES.includes(s) ? s : 'PENDING'; }
+
+function decisionColor(d) {
+  if (d === 'GO') return 'var(--go)';
+  if (d === 'NO-GO') return 'var(--nogo)';
+  if (d === 'CONDITIONAL') return 'var(--cond)';
+  return 'var(--muted)';
+}
+
+function fmtDuration(seconds) {
+  const s = toNum(seconds);
+  if (!s) return '';
+  if (s < 60) return `${Math.round(s)}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m ${Math.round(s%60)}s`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard?.writeText(text).catch(() => {});
+}
+
+function section(title, inner) {
+  return `<div class="data-section"><h4>${esc(title)}</h4>${inner}</div>`;
+}
+
+// Two-column table of label/value pairs; empty values are dropped.
+function kvTable(title, pairs) {
+  const rows = pairs.filter(([, v]) => !isEmpty(v));
+  if (!rows.length) return '';
+  return section(title, `<table class="results-table"><tbody>${rows.map(([k, v]) =>
+    `<tr><td><strong>${esc(k)}</strong></td><td>${fmtVal(v)}</td></tr>`).join('')}</tbody></table>`);
+}
+
+function metricsTable(title, metrics) {
+  const entries = Object.entries(obj(metrics));
+  if (!entries.length) return '';
+  return section(title, `<table class="results-table"><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>${
+    entries.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtVal(v)}</td></tr>`).join('')}</tbody></table>`);
+}
+
+// "0.712 [0.650, 0.770]" when ci is a [lo, hi] pair; plain number otherwise.
+function fmtCI(point, ci, digits = 3) {
+  const p = fmtNum(point, digits);
+  const c = arr(ci);
+  if (c.length !== 2 || c[0] == null || c[1] == null) return p;
+  return `${p || '—'} <span style="color:var(--muted)">[${fmtNum(c[0], digits)}, ${fmtNum(c[1], digits)}]</span>`;
+}
+
+function fmtSignedCI(delta, ci, digits = 3) {
+  const d = toNum(delta);
+  const p = d != null ? esc((d >= 0 ? '+' : '') + d.toFixed(digits)) : fmtVal(delta);
+  const c = arr(ci);
+  if (c.length !== 2 || c[0] == null || c[1] == null) return p;
+  return `${p} <span style="color:var(--muted)">[${fmtNum(c[0], digits)}, ${fmtNum(c[1], digits)}]</span>`;
+}
+
+// Pass/fail chip. ok: true -> PASS, false -> FAIL, anything else -> unknown.
+// `detail` must already be escaped HTML.
+function chip(label, ok, detail) {
+  const cls = ok === true ? 'pass' : ok === false ? 'fail' : 'unknown';
+  const word = ok === true ? 'PASS' : ok === false ? 'FAIL' : '?';
+  return `<span class="chip ${cls}">${esc(label)}: ${word}${detail ? ` <span class="detail">${detail}</span>` : ''}</span>`;
+}
+
+const TAG_CLASSES = ['non-ml', 'statistical', 'foundation-model'];
+function kindTag(kind) {
+  if (isEmpty(kind)) return '';
+  const k = String(kind);
+  return `<span class="tag${TAG_CLASSES.includes(k) ? ' ' + k : ''}">${esc(k)}</span>`;
+}
+
+function fitTag(fit) {
+  if (isEmpty(fit)) return '';
+  const f = String(fit).toLowerCase();
+  return `<span class="tag${['high', 'medium', 'low'].includes(f) ? ' fit-' + f : ''}">${esc(fit)}</span>`;
+}
+
+function levelTag(level) {
+  return isEmpty(level) ? '' : `<span class="tag level">${esc(level)}</span>`;
+}
+
+function listHtml(items) {
+  const a = arr(items);
+  return a.length ? `<ul style="padding-left:16px">${a.map(x => `<li style="font-size:13px">${fmtVal(x)}</li>`).join('')}</ul>` : '';
+}
+
+function shortHash(h) {
+  if (isEmpty(h)) return '';
+  const s = String(h);
+  return `<code title="${esc(s)}">${esc(s.length > 12 ? s.slice(0, 12) + '…' : s)}</code>`;
+}
+
+function fmtBytes(b) {
+  const n = toNum(b);
+  if (n == null) return fmtVal(b);
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let v = n, u = 0;
+  while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+  return esc(`${u ? v.toFixed(1) : v} ${units[u]}`);
+}
+
+function scrollToSkill(name) {
+  const card = document.getElementById('card-' + name);
+  if (!card) return;
+  const header = card.querySelector('.skill-card-header');
+  const body = card.querySelector('.skill-card-body');
+  if (body && !body.classList.contains('open')) { body.classList.add('open'); header?.classList.add('open'); }
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Gate Timeline ────────────────────────────────────────────────────────────
+function renderGateTimeline(gates) {
+  const el = document.getElementById('gate-timeline');
+  gates = arr(gates);
+  if (!gates.length) {
+    el.innerHTML = '<span class="empty">No gate data available</span>';
+    return;
+  }
+  el.innerHTML = gates.map((raw, i) => {
+    const g = obj(raw);
+    const status = gateStatus(g.status);
+    const dec = String(g.decision || '');
+    const conditional = status === 'PASS' && dec === 'CONDITIONAL';
+    const info = g.informational === true;
+    const cls = info ? 'info' : conditional ? 'PASS conditional' : status;
+    const statusText = info ? 'informational' : conditional ? 'PASS · conditional' : status;
+    const name = String(g.gate_name || '');
+    const label = name.replace(/-/g, '‑'); // non-breaking hyphens
+    const gn = g.gate_number;
+    const num = info ? 'i'
+      : Number.isInteger(gn) ? gn
+      : (typeof gn === 'string' && gn.length > 0 && gn.length <= 4) ? gn : (i + 1);
+    const title = g.artifact_path ? `${name} — ${g.artifact_path}` : name;
+    return `
+      <div class="gate-item" title="${esc(title)}">
+        <div class="gate-circle ${cls}" data-skill="${esc(name)}">${esc(num)}</div>
+        <div class="gate-label">${esc(label)}</div>
+        <div class="gate-status ${cls}">${esc(statusText)}</div>
+        ${dec && !conditional && !info ? `<div class="gate-decision-badge" style="color:${decisionColor(dec)}">${esc(dec)}</div>` : ''}
+      </div>`;
+  }).join('');
+  el.querySelectorAll('.gate-circle').forEach(c =>
+    c.addEventListener('click', () => scrollToSkill(c.dataset.skill)));
+}
+
+// ── Summary Panel ────────────────────────────────────────────────────────────
+function renderRunStrip(overall, artifacts) {
+  const el = document.getElementById('run-strip');
+  const approach = overall.approach || obj(artifacts['select-approach']).recommended_approach || '';
+  const items = [['Level', overall.level], ['Autonomy', overall.autonomy], ['Approach', approach]]
+    .filter(([, v]) => !isEmpty(v));
+  el.innerHTML = items.map(([k, v]) =>
+    `<span class="strip-item"><span class="k">${esc(k)}</span>${fmtVal(v)}</span>`).join('');
+  el.hidden = !items.length;
+}
+
+// ML Test Score (Breck et al.): each section score is the sum of its test points;
+// the final score is the minimum of the four section scores.
+const MLTS_SECTIONS = ['data', 'model', 'infra', 'monitoring'];
+
+function renderMlTestScore(mlts) {
+  const sectionEl = document.getElementById('mlts-section');
+  const m = obj(mlts);
+  const items = arr(m.items).map(obj);
+  if (!Object.keys(m).length) { sectionEl.hidden = true; return; }
+  sectionEl.hidden = false;
+
+  const scores = {};
+  for (const sec of MLTS_SECTIONS) {
+    let v = toNum(m[sec]);
+    if (v == null) {
+      const pts = items.filter(it => String(it.section || '').toLowerCase() === sec).map(it => toNum(it.points));
+      if (pts.length && pts.every(p => p != null)) v = pts.reduce((a, b) => a + b, 0);
+    }
+    scores[sec] = v;
+  }
+  const known = MLTS_SECTIONS.map(s => scores[s]).filter(v => v != null);
+  const computedFinal = known.length === MLTS_SECTIONS.length ? Math.min(...known) : null;
+  const reportedFinal = toNum(m.final);
+  const finalVal = reportedFinal != null ? reportedFinal : computedFinal;
+  const mismatch = reportedFinal != null && computedFinal != null && reportedFinal !== computedFinal;
+
+  const tile = (k, v, extra = '') =>
+    `<div class="score-tile ${extra}"><div class="k">${esc(k)}</div><div class="v">${v == null ? '—' : esc(v)}</div></div>`;
+  let html = `<div class="score-tiles">${MLTS_SECTIONS.map(s => tile(s, scores[s])).join('')}${tile('final (min)', finalVal, 'final')}</div>`;
+  if (mismatch) {
+    html += `<p class="proto-line warn">Reported final (${esc(reportedFinal)}) differs from min of section scores (${esc(computedFinal)}).</p>`;
+  }
+  if (items.length) {
+    const ptsCls = p => p === 1 ? 'pts-1' : p === 0.5 ? 'pts-half' : p === 0 ? 'pts-0' : '';
+    html += `<details class="items"><summary>${items.length} test items</summary>
+      <table class="results-table"><thead><tr><th>Section</th><th>Test</th><th>Points</th><th>Evidence</th></tr></thead>
+      <tbody>${items.map(it => { const p = toNum(it.points); return `<tr>
+        <td>${fmtVal(it.section)}</td><td>${fmtVal(it.test)}</td>
+        <td class="${ptsCls(p)}">${fmtVal(it.points)}</td>
+        <td class="mono">${fmtVal(it.evidence)}</td></tr>`; }).join('')}
+      </tbody></table></details>`;
+  }
+  document.getElementById('mlts').innerHTML = html;
+}
+
+function renderSummary(overall, artifacts, runDir, loadErrors) {
+  const grid = document.getElementById('summary-grid');
+  const summaryArt = obj(artifacts['run-summary']);
+
+  const ts = overall.timestamp ? String(overall.timestamp).replace('T',' ').replace('Z',' UTC').slice(0,22) : '';
+  const kvs = [
+    ['Run ID', overall.run_id],
+    ['Timestamp', ts],
+    ['Objective', overall.objective || summaryArt.objective || ''],
+    ['Decision', overall.decision],
+    ['Confidence', overall.confidence || ''],
+    ['Data source', summaryArt.data_source || ''],
+    ['Label', summaryArt.label_col || ''],
+    ['Primary metric', summaryArt.primary_metric || ''],
+    ['Run directory', runDir || ''],
+  ].filter(([, v]) => !isEmpty(v));
+
+  grid.innerHTML = kvs.map(([k, v]) => `
+    <div class="summary-kv">
+      <div class="key">${esc(k)}</div>
+      <div class="val">${k === 'Decision' ? badge(String(v)) : fmtVal(v)}</div>
+    </div>`).join('');
+
+  const br = document.getElementById('blockers-risks');
+  const blockers = arr(overall.top_blockers);
+  const risks = arr(overall.top_risks);
+  const h4 = t => `<h4 style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${esc(t)}</h4>`;
+
+  let html = '';
+  if (blockers.length) {
+    html += `<div style="flex:1;min-width:200px">${h4('Blockers')}
+      <ul class="blockers-list">${blockers.map(b => `<li>${fmtVal(b)}</li>`).join('')}</ul></div>`;
+  }
+  if (risks.length) {
+    html += `<div style="flex:1;min-width:200px">${h4('Risks')}
+      <ul class="blockers-list risks-list">${risks.map(r => `<li>${fmtVal(r)}</li>`).join('')}</ul></div>`;
+  }
+  if (loadErrors.length) {
+    html += `<div style="flex:1;min-width:200px">${h4('Unreadable artifacts')}
+      <ul class="blockers-list">${loadErrors.map(e => `<li>${esc(obj(e).error || e)}</li>`).join('')}</ul></div>`;
+  }
+  br.innerHTML = html;
+}
+
+// ── Skill Cards ──────────────────────────────────────────────────────────────
+const SKILL_ORDER = [
+  'select-approach', 'review-target', 'check-dataset-quality', 'build-baseline',
+  'plan-experiment', 'feature-engineer', 'check-data-pipeline', 'train-model',
+  'babysit-training', 'check-failed-run', 'check-eval', 'explain-model',
+  'check-deployment-readiness', 'demonstrate-value', 'recommend-new-approaches',
+];
+
+function renderSkillCards(artifacts, files) {
+  const container = document.getElementById('skill-cards');
+  const keys = SKILL_ORDER.filter(k => artifacts[k]);
+  // Also include any extra artifacts not in our known order
+  Object.keys(artifacts).forEach(k => { if (k !== 'run-summary' && !keys.includes(k)) keys.push(k); });
+
+  if (!keys.length) {
+    container.innerHTML = '<span class="empty">No individual skill artifacts found.</span>';
+    return;
+  }
+
+  container.innerHTML = keys.map(name => {
+    try {
+      return buildSkillCard(name, obj(artifacts[name]), files[name]);
+    } catch (e) {
+      // One malformed artifact must not blank the whole report.
+      return `
+      <div class="skill-card" id="card-${esc(name)}">
+        <div class="skill-card-header"><h3>${esc(name)}</h3>${badge('PENDING')}<span class="chevron">▼</span></div>
+        <div class="skill-card-body">
+          <p class="load-error">Could not render this artifact: ${esc(e && e.message)}</p>
+          <pre class="json">${esc(safeStringify(artifacts[name]))}</pre>
+        </div>
+      </div>`;
+    }
+  }).join('');
+
+  container.querySelectorAll('.skill-card-header').forEach(h => {
+    h.addEventListener('click', () => {
+      const body = h.nextElementSibling;
+      const open = body.classList.toggle('open');
+      h.classList.toggle('open', open);
+    });
+  });
+
+  container.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const bar = tab.closest('.tab-bar');
+      const panels = bar.nextElementSibling;
+      bar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      panels.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      panels.querySelector(`[data-tab="${tab.dataset.target}"]`).classList.add('active');
+    });
+  });
+
+  container.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      copyToClipboard(btn.dataset.cmd);
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  });
+}
+
+function buildSkillCard(name, art, file) {
+  const decision = String(art.decision || 'PENDING');
+  const duration = fmtDuration(art.duration_seconds);
+  const summary = art.summary || '';
+  const evBlocks = Array.isArray(art.evidence_blocks) ? art.evidence_blocks.length : toNum(art.evidence_blocks);
+
+  return `
+  <div class="skill-card" id="card-${esc(name)}">
+    <div class="skill-card-header">
+      <h3>${esc(name)}</h3>
+      ${levelTag(art.level)}
+      ${badge(decision)}
+      ${duration ? `<span class="duration">${esc(duration)}</span>` : ''}
+      ${evBlocks != null ? `<button class="ev-link" data-ev-skill="${esc(name)}" title="Open this skill's section of evidence.md">${esc(evBlocks)} evidence block${evBlocks === 1 ? '' : 's'}</button>` : ''}
+      <span class="chevron">▼</span>
+    </div>
+    <div class="skill-card-body">
+      ${art._load_error ? `<p class="load-error">${esc(art._load_error)}</p>` : ''}
+      ${summary ? `<p style="margin-bottom:12px;color:var(--muted);font-size:13px">${fmtVal(summary)}</p>` : ''}
+      <div class="tab-bar">
+        <div class="tab active" data-target="details">Details</div>
+        <div class="tab" data-target="raw">Raw JSON</div>
+      </div>
+      <div>
+        <div class="tab-panel active" data-tab="details">
+          ${buildDetailsPanel(name, art, file)}
+        </div>
+        <div class="tab-panel" data-tab="raw">
+          <pre class="json">${esc(safeStringify(art))}</pre>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildDetailsPanel(name, art, file) {
+  let html = '';
+
+  const findings = arr(art.findings);
+  if (findings.length) {
+    const hasEv = findings.some(raw => !isEmpty(obj(raw).evidence));
+    html += section(`Findings (${findings.length})`, `
+      <table class="findings-table">
+        <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Description</th><th>Fix</th>${hasEv ? '<th>Evidence</th>' : ''}</tr></thead>
+        <tbody>${findings.map(raw => { const f = obj(raw); return `
+          <tr>
+            <td>${fmtVal(f.id)}</td>
+            <td class="${severityClass(f.severity)}">${fmtVal(f.severity)}</td>
+            <td><strong>${fmtVal(f.title)}</strong></td>
+            <td>${fmtVal(f.description)}</td>
+            <td>${fmtVal(f.fix)}</td>
+            ${hasEv ? `<td>${evidenceRefs(f.evidence)}</td>` : ''}
+          </tr>`; }).join('')}
+        </tbody>
+      </table>`);
+  } else {
+    html += `<p class="empty" style="margin-bottom:12px">No findings.</p>`;
+  }
+
+  html += buildSkillSpecific(name, art);
+  html += buildProvenance(art, file);
+
+  const cmds = arr(art.next_commands);
+  if (cmds.length) {
+    html += `<div class="next-cmds">
+      <h4>Next Commands</h4>
+      ${cmds.map(c => { const s = typeof c === 'string' ? c : JSON.stringify(c); return `
+        <div class="cmd-block">
+          <span style="flex:1;word-break:break-all">${esc(s)}</span>
+          <button class="copy-btn" data-cmd="${esc(s)}">Copy</button>
+        </div>`; }).join('')}
+    </div>`;
+  }
+
+  return html || '<span class="empty">No details available.</span>';
+}
+
+// Inputs/outputs the artifact says it used. These are the agent's own claims,
+// shown so a reviewer can check them against the files.
+const PROVENANCE_KEYS = [
+  ['data_source', 'Data source'], ['dataset', 'Dataset'], ['dataset_rows', 'Dataset rows'],
+  ['format', 'Format'], ['model', 'Model'], ['checkpoint', 'Checkpoint'], ['baseline', 'Baseline'],
+  ['target', 'Target'], ['target_type', 'Target type'], ['train_cmd', 'Train command'],
+  ['best_checkpoint', 'Best checkpoint'], ['babysit_training_ref', 'Babysit-training artifact'],
+  ['model_card_path', 'Model card'], ['presentation_path', 'Presentation'],
+  ['autoresearch_path', 'Autoresearch output'], ['implementation_paths', 'Implementation paths'],
+  ['evidence_notebook', 'Evidence notebook'],
+  ['artifacts_used', 'Artifacts used'], ['inputs_used', 'Inputs used'],
+];
+
+function provVal(v) {
+  if (Array.isArray(v)) return v.map(x => `<code>${fmtVal(x)}</code>`).join('<br>');
+  if (v && typeof v === 'object') {
+    return Object.entries(v).map(([k, x]) => `${esc(k)}: <code>${fmtVal(x)}</code>`).join('<br>');
+  }
+  return `<code>${esc(v)}</code>`;
+}
+
+// Structured `provenance` object: git, env, lockfiles, data hashes, seed, split manifest.
+// Rows are [label, already-escaped HTML].
+function structuredProvenanceRows(prov) {
+  const p = obj(prov);
+  const rows = [];
+  const git = obj(p.git);
+  if (!isEmpty(git)) {
+    const dirty = git.dirty === true
+      ? ' <span style="color:var(--nogo);font-weight:600">(dirty working tree)</span>'
+      : git.dirty === false ? ' <span style="color:var(--muted)">(clean)</span>' : '';
+    const branch = isEmpty(git.branch) ? '' : `<code>${esc(git.branch)}</code> @ `;
+    rows.push(['Git', `${branch}${shortHash(git.sha) || '<span class="empty">no sha</span>'}${dirty}`]);
+  }
+  const env = obj(p.env);
+  if (!isEmpty(env.python)) rows.push(['Python', `<code>${esc(env.python)}</code>`]);
+  const pkgs = Object.entries(obj(env.packages));
+  if (pkgs.length) {
+    const list = pkgs.map(([k, v]) => `<code>${esc(k)}==${esc(v)}</code>`).join(' ');
+    rows.push(['Packages', pkgs.length > 8
+      ? `<details><summary>${pkgs.length} packages</summary>${list}</details>` : list]);
+  }
+  const locks = arr(p.lockfiles);
+  if (locks.length) rows.push(['Lockfiles', locks.map(l => `<code>${fmtVal(l)}</code>`).join('<br>')]);
+  const data = arr(p.data).map(obj);
+  if (data.length) {
+    rows.push(['Data files', `<table class="results-table"><thead><tr><th>Path</th><th>sha256</th><th>Size</th></tr></thead><tbody>${
+      data.map(d => `<tr><td class="mono">${fmtVal(d.path)}</td><td>${shortHash(d.sha256)}</td><td>${fmtBytes(d.bytes)}</td></tr>`).join('')
+    }</tbody></table>`]);
+  }
+  if (!isEmpty(p.seed)) rows.push(['Seed', `<code>${fmtVal(p.seed)}</code>`]);
+  const sm = obj(p.split_manifest);
+  if (!isEmpty(sm)) {
+    rows.push(['Split manifest', `${isEmpty(sm.path) ? '' : `<code>${fmtVal(sm.path)}</code>`}${
+      isEmpty(sm.test_keys_sha256) ? '' : ` · test keys ${shortHash(sm.test_keys_sha256)}`}`]);
+  }
+  return rows;
+}
+
+function buildProvenance(art, file) {
+  const rows = [];
+  if (file) rows.push(['Artifact file', provVal(file)]);
+  for (const [k, label] of PROVENANCE_KEYS) {
+    if (!isEmpty(art[k])) rows.push([label, provVal(art[k])]);
+  }
+  rows.push(...structuredProvenanceRows(art.provenance));
+  let html = '';
+  if (rows.length) {
+    html += section('Provenance (as reported)', `<table class="results-table prov-table"><tbody>${
+      rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('')}</tbody></table>`);
+  }
+  const evidence = arr(art.evidence);
+  if (evidence.length) {
+    html += section('Evidence', `<ul style="padding-left:16px">${
+      evidence.map(e => `<li class="mono">${fmtVal(e)}</li>`).join('')}</ul>`);
+  }
+  return html;
+}
+
+const BASE_KEYS = new Set(['schema_version', 'skill_name', 'run_id', 'timestamp', 'duration_seconds',
+  'decision', 'confidence', 'summary', 'findings', 'next_commands', '_load_error', 'evidence',
+  'level', 'provenance', 'evidence_blocks', 'evidence_notebook', ...PROVENANCE_KEYS.map(([k]) => k)]);
+
+function buildGeneric(art) {
+  const pairs = Object.entries(art).filter(([k, v]) => !BASE_KEYS.has(k) && !isEmpty(v));
+  return kvTable('Fields', pairs);
+}
+
+function buildSkillSpecific(name, art) {
+  let html = '';
+
+  if (name === 'check-dataset-quality') {
+    const profile = obj(art.profile);
+    const splits = ['train', 'validation', 'test'].filter(s => profile[s + '_rows'] != null);
+    if (splits.length || profile.label_col) {
+      html += section('Profile', `
+        <table class="results-table"><thead><tr><th>Split</th><th>Rows</th></tr></thead><tbody>
+          ${splits.map(s => `<tr><td>${esc(s)}</td><td>${fmtInt(profile[s + '_rows'])}</td></tr>`).join('')}
+        </tbody></table>
+        ${profile.label_col ? `<p style="margin-top:8px;font-size:13px;color:var(--muted)">Label: <strong>${fmtVal(profile.label_col)}</strong></p>` : ''}`);
+    }
+    const counts = [
+      ['Blockers', art.blocker_count, 'var(--blocker)'],
+      ['High', art.high_count, 'var(--high)'],
+      ['Medium', art.medium_count, 'var(--medium)'],
+      ['Low', art.low_count, 'var(--low)'],
+    ].filter(([, v]) => v != null);
+    if (counts.length) {
+      html += section('Finding Counts', `<div style="display:flex;gap:12px;flex-wrap:wrap">
+          ${counts.map(([label, count, color]) =>
+            `<span style="color:${color};font-weight:700;font-size:14px">${fmtVal(count)} <span style="font-weight:400;color:var(--muted)">${esc(label)}</span></span>`
+          ).join('')}
+        </div>`);
+    }
+  }
+
+  else if (name === 'build-baseline') {
+    html += kvTable('Baseline Summary', [
+      ['Task type', art.task_type], ['Label', art.label_col], ['Primary metric', art.primary_metric],
+      ['Best baseline', art.best_baseline], ['Best score', art.best_score],
+    ]);
+    const baselines = arr(art.baselines);
+    if (baselines.length) {
+      html += section('Baselines', `<table class="results-table">
+        <thead><tr><th>Method</th><th>Description</th><th>Score</th><th>Best</th></tr></thead>
+        <tbody>${baselines.map(raw => { const b = obj(raw); return `<tr>
+          <td><strong>${fmtVal(b.method)}</strong>${kindTag(b.kind)}</td><td>${fmtVal(b.description)}</td>
+          <td>${fmtNum(b.score, 4)}</td><td>${b.is_best === true ? '✓' : ''}</td></tr>`; }).join('')}
+        </tbody></table>`);
+    }
+  }
+
+  else if (name === 'plan-experiment') {
+    const candidates = arr(art.candidates);
+    if (candidates.length) {
+      html += section('Model Candidates', `<table class="results-table">
+          <thead><tr><th>#</th><th>Model Family</th><th>Rationale</th><th>Est. GPU-hrs</th><th>Est. Cost</th></tr></thead>
+          <tbody>${candidates.map(raw => { const c = obj(raw); const cost = toNum(c.estimated_cost_usd); return `<tr>
+              <td>${fmtVal(c.rank)}</td>
+              <td><strong>${fmtVal(c.model_family)}</strong></td>
+              <td>${fmtVal(c.rationale)}</td>
+              <td>${fmtVal(c.estimated_gpu_hours)}</td>
+              <td>${cost != null ? esc('$' + cost) : fmtVal(c.estimated_cost_usd)}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+  }
+
+  else if (name === 'review-target') {
+    const contract = obj(art.prediction_contract);
+    html += kvTable('Prediction Contract', Object.entries(contract));
+    html += kvTable('Target', [['Task type', art.task_type], ['Label formula', art.label_formula]]);
+    const risks = arr(art.leakage_risks);
+    if (risks.length) {
+      html += section('Leakage Risks', `<table class="findings-table">
+        <thead><tr><th>Feature</th><th>Severity</th><th>Mitigation</th></tr></thead>
+        <tbody>${risks.map(raw => { const r = obj(raw); return `<tr><td>${fmtVal(r.feature)}</td>
+          <td class="${severityClass(r.severity)}">${fmtVal(r.severity)}</td><td>${fmtVal(r.mitigation)}</td></tr>`; }).join('')}
+        </tbody></table>`);
+    }
+  }
+
+  else if (name === 'feature-engineer') {
+    const baseFt = arr(art.baseline_feature_set);
+    if (baseFt.length) {
+      html += section('Baseline Feature Set', `<ul style="padding-left:16px">${
+        baseFt.map(f => `<li style="font-size:13px">${fmtVal(f)}</li>`).join('')}</ul>`);
+    }
+    const blocked = arr(art.blocked_features);
+    if (blocked.length) {
+      html += section('Blocked Features', `<table class="results-table">
+          <thead><tr><th>Feature</th><th>Reason</th></tr></thead>
+          <tbody>${blocked.map(raw => { const b = obj(raw); return `<tr><td>${fmtVal(b.feature)}</td><td style="color:var(--nogo)">${fmtVal(b.reason)}</td></tr>`; }).join('')}
+          </tbody></table>`);
+    }
+  }
+
+  else if (name === 'check-data-pipeline') {
+    if (art.checks_total != null) {
+      html += section('Checks', `<p style="font-size:14px"><strong>${fmtVal(art.checks_passed ?? '?')} / ${fmtVal(art.checks_total)}</strong> passed</p>`);
+    }
+    const failures = arr(art.failures);
+    if (failures.length) {
+      html += section('Failures', `<table class="findings-table">
+          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Fix</th></tr></thead>
+          <tbody>${failures.map(raw => { const f = obj(raw); return `<tr>
+              <td><strong>${fmtVal(f.check)}</strong><br><small style="color:var(--muted)">${fmtVal(f.location)}</small></td>
+              <td>${fmtVal(f.expected)}</td>
+              <td>${fmtVal(f.actual)}</td>
+              <td>${fmtVal(f.fix)}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+  }
+
+  else if (name === 'train-model') {
+    html += kvTable('Training', [
+      ['Terminal state', art.terminal_state], ['Total steps', art.total_steps],
+      ['Total epochs', art.total_epochs], ['Duration', fmtDuration(art.training_duration_seconds)],
+      ['Early stopping', art.early_stopping],
+    ]);
+    html += metricsTable('Hyperparameters', art.hyperparameters);
+    html += metricsTable('Final Metrics', art.final_metrics);
+    const ckpts = arr(art.all_checkpoints);
+    if (ckpts.length) {
+      html += section('Checkpoints', `<table class="results-table">
+        <thead><tr><th>Step</th><th>Path</th><th>Metrics</th></tr></thead>
+        <tbody>${ckpts.map(raw => { const c = obj(raw); return `<tr><td>${fmtVal(c.step)}</td>
+          <td class="mono">${fmtVal(c.path)}</td><td>${fmtVal(c.metrics)}</td></tr>`; }).join('')}
+        </tbody></table>`);
+    }
+  }
+
+  else if (name === 'babysit-training') {
+    html += kvTable('Run', [['Terminal state', art.terminal_state], ['Total steps', art.total_steps]]);
+    const anomalies = arr(art.anomalies_detected);
+    if (anomalies.length) {
+      html += section('Anomalies Detected', `<table class="findings-table">
+          <thead><tr><th>Step</th><th>Type</th><th>Severity</th><th>Description</th><th>Action</th></tr></thead>
+          <tbody>${anomalies.map(raw => { const a = obj(raw); return `<tr>
+              <td>${fmtVal(a.step)}</td>
+              <td>${fmtVal(a.type)}</td>
+              <td class="${severityClass(a.severity)}">${fmtVal(a.severity)}</td>
+              <td>${fmtVal(a.description)}</td>
+              <td>${fmtVal(a.action_taken || 'none')}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+    html += metricsTable('Final Metrics', art.final_metrics);
+  }
+
+  else if (name === 'check-failed-run') {
+    if (art.primary_cause) {
+      html += section('Failure Analysis', `<table class="results-table"><tbody>
+            <tr><td><strong>Status</strong></td><td>${fmtVal(art.run_status)}</td></tr>
+            <tr><td><strong>Primary cause</strong></td><td>${fmtVal(art.primary_cause)} (confidence: ${fmtNum(art.primary_cause_confidence, 2)})</td></tr>
+            <tr><td><strong>Contributing factors</strong></td><td>${arr(art.contributing_factors).map(fmtVal).join(', ') || 'none'}</td></tr>
+            <tr><td><strong>Root cause</strong></td><td>${fmtVal(art.root_cause)}</td></tr>
+          </tbody></table>`);
+    }
+    const riskColor = r => r === 'dangerous' ? 'var(--nogo)' : r === 'needs-approval' ? 'var(--cond)' : 'var(--go)';
+    const fixes = arr(art.fixes);
+    if (fixes.length) {
+      html += section('Proposed Fixes', `<table class="findings-table">
+          <thead><tr><th>Action</th><th>Risk</th><th>Expected Impact</th><th>Validate</th></tr></thead>
+          <tbody>${fixes.map(raw => { const f = obj(raw); return `<tr>
+              <td>${fmtVal(f.action)}</td>
+              <td style="color:${riskColor(f.risk)};font-weight:600">${fmtVal(f.risk)}</td>
+              <td>${fmtVal(f.expected_impact)}</td>
+              <td>${fmtVal(f.validate)}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+  }
+
+  else if (name === 'check-eval') {
+    // Evaluation protocol: a final (test-set) evaluation whose test keys don't match
+    // the split manifest is shown in red.
+    const proto = obj(art.protocol);
+    if (!isEmpty(proto)) {
+      const match = proto.test_keys_sha256_match;
+      const isFinal = proto.final === true;
+      const cls = isFinal && match === false ? 'bad' : isFinal && match == null ? 'warn' : '';
+      const parts = [];
+      if (!isEmpty(proto.split)) parts.push(`split: <strong>${esc(proto.split)}</strong>`);
+      if (proto.final != null) parts.push(`final: <strong>${esc(proto.final)}</strong>`);
+      parts.push(`test-keys hash match: <strong>${match === true ? 'yes' : match === false ? 'NO' : 'unknown'}</strong>`);
+      if (proto.test_evaluations != null) parts.push(`test evaluations: <strong>${fmtVal(proto.test_evaluations)}</strong>`);
+      html += `<div class="proto-line ${cls}">Protocol · ${parts.join(' · ')}</div>`;
+    }
+    const cal = obj(art.calibration);
+    if (cal.brier != null || cal.ece != null) {
+      const parts = [];
+      if (cal.brier != null) parts.push(`Brier ${fmtNum(cal.brier, 4)}`);
+      if (cal.ece != null) parts.push(`ECE ${fmtNum(cal.ece, 4)}`);
+      html += `<div class="proto-line">Calibration · ${parts.join(' · ')}</div>`;
+    }
+
+    const results = arr(art.results).map(obj);
+    if (results.length) {
+      const hasN = results.some(r => r.n != null);
+      html += section('Results', `<table class="results-table">
+          <thead><tr><th>Task / Metric</th>${hasN ? '<th>n</th>' : ''}<th>Score</th><th>Baseline</th><th>Delta</th></tr></thead>
+          <tbody>${results.map(r => {
+            const d = toNum(r.delta);
+            const deltaClass = r.regressed === true ? 'delta-neg' : d > 0 ? 'delta-pos' : d < 0 ? 'delta-neg' : '';
+            return `<tr>
+              <td>${fmtVal(r.task)} / ${fmtVal(r.metric)}</td>
+              ${hasN ? `<td>${fmtInt(r.n)}</td>` : ''}
+              <td>${fmtCI(r.score, r.ci)}</td>
+              <td>${fmtCI(r.baseline_score, r.baseline_ci)}</td>
+              <td class="${deltaClass}">${r.delta == null ? '' : fmtSignedCI(r.delta, r.delta_ci)}</td>
+            </tr>`;
+          }).join('')}
+          </tbody></table>`);
+    }
+
+    const slices = arr(art.slices).map(obj);
+    if (slices.length) {
+      html += section(`Slices (${slices.filter(s => s.flagged === true).length} flagged)`, `<table class="results-table">
+        <thead><tr><th>Column</th><th>Value</th><th>n</th><th>Score</th><th>Flagged</th></tr></thead>
+        <tbody>${slices.map(sl => `<tr class="${sl.flagged === true ? 'flagged' : ''}">
+          <td>${fmtVal(sl.col)}</td><td>${fmtVal(sl.value)}</td><td>${fmtInt(sl.n)}</td>
+          <td>${fmtCI(sl.point, sl.ci)}</td><td>${sl.flagged === true ? '⚠' : ''}</td></tr>`).join('')}
+        </tbody></table>`);
+    }
+    const regressions = arr(art.regressions);
+    if (regressions.length) {
+      html += section('Regressions', `<ul>${regressions.map(r => `<li style="color:var(--nogo)">${fmtVal(r)}</li>`).join('')}</ul>`);
+    }
+  }
+
+  else if (name === 'explain-model') {
+    const topFeatures = arr(art.top_features).slice(0, 10);
+    if (topFeatures.length) {
+      html += section(`Top Features (top ${topFeatures.length})`, `<table class="results-table">
+          <thead><tr><th>#</th><th>Feature</th><th>Importance</th><th>SHAP |mean|</th></tr></thead>
+          <tbody>${topFeatures.map(raw => { const f = obj(raw); return `<tr>
+              <td>${fmtVal(f.rank)}</td>
+              <td>${fmtVal(f.feature)}</td>
+              <td>${fmtNum(f.importance, 4)}</td>
+              <td>${fmtNum(f.shap_mean_abs, 4)}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+    const biasAudit = arr(art.bias_audit);
+    if (biasAudit.length) {
+      html += section('Bias / Fairness Audit', `<table class="results-table">
+          <thead><tr><th>Attribute</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Status</th></tr></thead>
+          <tbody>${biasAudit.map(raw => { const b = obj(raw); return `<tr>
+              <td>${fmtVal(b.attribute)}</td>
+              <td>${fmtVal(b.metric)}</td>
+              <td>${fmtNum(b.value, 3)}</td>
+              <td>${fmtVal(b.threshold)}</td>
+              <td style="color:${b.passed ? 'var(--go)' : 'var(--nogo)'};font-weight:600">${b.passed ? 'PASS' : 'FAIL'}</td>
+            </tr>`; }).join('')}
+          </tbody></table>`);
+    }
+  }
+
+  else if (name === 'select-approach') {
+    html += kvTable('Recommendation', [
+      ['Recommended approach', art.recommended_approach], ['Problem type', art.problem_type],
+    ]);
+    const cands = arr(art.candidates).map(obj);
+    if (cands.length) {
+      html += section(`Candidates (${cands.length})`, `<table class="findings-table">
+        <thead><tr><th>Approach</th><th>Fit</th><th>Rationale</th><th>Data needed</th><th>Eval method</th><th>Est. cost</th><th>Risks</th></tr></thead>
+        <tbody>${cands.map(c => `<tr>
+          <td><strong>${fmtVal(c.approach)}</strong></td><td>${fitTag(c.fit)}</td>
+          <td>${fmtVal(c.rationale)}</td><td>${fmtVal(c.data_needed)}</td><td>${fmtVal(c.eval_method)}</td>
+          <td>${fmtVal(c.est_cost)}</td><td>${arr(c.risks).map(fmtVal).join('<br>')}</td></tr>`).join('')}
+        </tbody></table>`);
+    }
+    const ruled = arr(art.ruled_out).map(obj);
+    if (ruled.length) {
+      html += section('Ruled out', `<table class="results-table"><thead><tr><th>Approach</th><th>Reason</th></tr></thead>
+        <tbody>${ruled.map(r => `<tr><td>${fmtVal(r.approach)}</td><td>${fmtVal(r.reason)}</td></tr>`).join('')}</tbody></table>`);
+    }
+    html += kvTable('Constraints', Object.entries(obj(art.constraints)));
+    const wwc = listHtml(art.what_would_change_this);
+    if (wwc) html += section('What would change this', wwc);
+    const lm = obj(art.lifecycle_map);
+    if (!isEmpty(lm)) {
+      const applies = arr(lm.applies);
+      const skipped = arr(lm.skipped).map(obj);
+      const notCovered = arr(lm.not_covered);
+      let inner = '';
+      if (applies.length) {
+        inner += `<p style="font-size:13px;margin-bottom:6px"><strong>Applies:</strong> ${applies.map(a => `<span class="tag fit-high">${fmtVal(a)}</span>`).join(' ')}</p>`;
+      }
+      if (skipped.length) {
+        inner += `<table class="results-table"><thead><tr><th>Skipped skill</th><th>Reason</th></tr></thead>
+          <tbody>${skipped.map(k => `<tr><td>${fmtVal(k.skill)}</td><td>${fmtVal(k.reason)}</td></tr>`).join('')}</tbody></table>`;
+      }
+      if (notCovered.length) {
+        inner += `<p style="font-size:13px;margin-top:8px"><strong>Not covered by any skill:</strong></p>${listHtml(notCovered)}`;
+      }
+      if (inner) html += section('Lifecycle map', inner);
+    }
+  }
+
+  else if (name === 'check-deployment-readiness') {
+    const chips = [];
+    const parity = obj(art.parity);
+    if (!isEmpty(parity)) {
+      const detail = [parity.max_abs_diff != null ? `max |Δ| ${fmtVal(parity.max_abs_diff)}` : '',
+                      parity.n != null ? `n=${fmtVal(parity.n)}` : ''].filter(Boolean).join(', ');
+      chips.push(chip('Parity', parity.parity_pass, detail));
+    }
+    const lat = obj(art.latency);
+    if (!isEmpty(lat)) {
+      const ms = ['p50_ms', 'p95_ms', 'p99_ms'].filter(k => lat[k] != null)
+        .map(k => `${esc(k.replace('_ms', ''))} ${fmtVal(lat[k])}ms`);
+      if (lat.budget_ms != null) ms.push(`budget ${fmtVal(lat.budget_ms)}ms`);
+      chips.push(chip('Latency', lat.pass, ms.join(' · ')));
+    }
+    const cc = obj(art.contract_check);
+    if (!isEmpty(cc)) {
+      const v = toNum(cc.violations), b = toNum(cc.blockers);
+      const ok = v == null && b == null ? null : (v || 0) === 0 && (b || 0) === 0;
+      chips.push(chip('Contract', ok, `${fmtVal(cc.violations ?? '?')} violations, ${fmtVal(cc.blockers ?? '?')} blockers`));
+    }
+    if (chips.length) html += section('Checks', `<div>${chips.join('')}</div>`);
+    html += kvTable('Package & resources', [
+      ['Model path', art.model_path], ['Package format', art.package_format], ['Signature', art.signature_path],
+      ['Throughput (rows/s)', art.throughput_rows_per_s], ['Model size (MB)', art.model_size_mb],
+      ['Peak RSS (MB)', art.peak_rss_mb],
+    ]);
+    const rollout = obj(art.rollout);
+    html += kvTable('Monitoring & rollout', [
+      ['Drift baseline', art.drift_baseline_path], ['Monitoring plan', art.monitoring_plan_path],
+      ['Rollout strategy', rollout.strategy], ['Rollback criteria', rollout.rollback_criteria],
+    ]);
+  }
+
+  else if (name === 'demonstrate-value') {
+    html += kvTable('Value Summary', [
+      ['Business context', art.business_context], ['Primary metric', art.primary_metric],
+      ['Baseline score', art.baseline_score], ['Model score', art.model_score],
+      ['Improvement', art.improvement_delta],
+    ]);
+    const impact = arr(art.business_impact);
+    if (impact.length) {
+      html += section('Business Impact', `<table class="results-table">
+        <thead><tr><th>Metric</th><th>Impact</th><th>Estimated value</th></tr></thead>
+        <tbody>${impact.map(raw => { const b = obj(raw); return `<tr><td>${fmtVal(b.metric)}</td>
+          <td>${fmtVal(b.description)}</td><td>${fmtVal(b.estimated_value)}</td></tr>`; }).join('')}
+        </tbody></table>`);
+    }
+  }
+
+  else if (name === 'recommend-new-approaches') {
+    html += kvTable('Diagnosis', [
+      ['Primary metric', art.primary_metric], ['Current score', art.current_score],
+      ['Baseline score', art.baseline_score], ['Performance gap', art.performance_gap],
+      ['Diagnostic summary', art.diagnostic_summary], ['Autoresearch used', art.autoresearch_used],
+    ]);
+    const recs = arr(art.recommendations).map(obj)
+      .sort((a, b) => (toNum(a.rank) ?? 1e9) - (toNum(b.rank) ?? 1e9));
+    if (recs.length) {
+      html += section(`Recommendations (${recs.length})`, `<table class="findings-table">
+        <thead><tr><th>#</th><th>Idea</th><th>Category</th><th>Impact</th><th>Effort</th><th>Source</th><th>Next command</th></tr></thead>
+        <tbody>${recs.map(r => `<tr>
+          <td>${fmtVal(r.rank)}</td>
+          <td><strong>${fmtVal(r.idea)}</strong><br><small style="color:var(--muted)">${fmtVal(r.rationale)}</small></td>
+          <td>${fmtVal(r.category)}</td>
+          <td>${fmtVal(r.expected_impact)}</td>
+          <td>${fmtVal(r.effort)}</td>
+          <td>${fmtVal(r.source)}</td>
+          <td class="mono">${fmtVal(r.next_command)}</td>
+        </tr>`).join('')}
+        </tbody></table>`);
+    }
+  }
+
+  else {
+    html += buildGeneric(art);
+  }
+
+  return html;
+}
+
+// ── Evidence notebook ────────────────────────────────────────────────────────
+// evidence.md is a showboat notebook: "# Title", "## <section>" headings, free-text
+// notes, and fenced code blocks each followed by a fenced ```output block.
+// Nothing is rendered as markdown: notes are shown as escaped plain text.
+let EVIDENCE_SECTIONS = [];   // section headings, index = ev-sec-<i>
+
+function parseNotebook(text) {
+  const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+  let title = '';
+  const preamble = { heading: '', items: [] };
+  const sections = [];
+  let cur = preamble;
+  let note = [];
+  const flushNote = () => {
+    const t = note.join('\n').replace(/^\n+|\s+$/g, '');
+    if (t.trim()) cur.items.push({ type: 'note', text: t });
+    note = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fence = line.match(/^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)[^`]*$/);
+    if (fence) {
+      flushNote();
+      const marker = fence[1];
+      const lang = fence[2] || '';
+      const closeRe = new RegExp('^ {0,3}' + (marker[0] === '`' ? '`' : '~') + '{' + marker.length + ',}\\s*$');
+      const body = [];
+      i++;
+      while (i < lines.length && !closeRe.test(lines[i])) { body.push(lines[i]); i++; }
+      const content = body.join('\n');
+      const prev = cur.items[cur.items.length - 1];
+      if (lang.toLowerCase() === 'output') {
+        if (prev && prev.type === 'code' && prev.output == null && prev.code != null) prev.output = content;
+        else cur.items.push({ type: 'code', lang: 'output', code: null, output: content });
+      } else {
+        cur.items.push({ type: 'code', lang, code: content, output: null });
+      }
+      continue;
+    }
+    const h2 = line.match(/^##\s+(.*?)\s*#*\s*$/);
+    if (h2) {
+      flushNote();
+      cur = { heading: h2[1], items: [] };
+      sections.push(cur);
+      continue;
+    }
+    const h1 = line.match(/^#\s+(.*?)\s*$/);
+    if (h1 && !title && !sections.length && !preamble.items.length && !note.join('').trim()) {
+      title = h1[1];
+      continue;
+    }
+    if (/^\s*<!--\s*showboat-id:.*-->\s*$/.test(line)) continue;  // showboat's internal marker
+    note.push(line.replace(/^\*(\d{4}-\d\d-\d\dT[^*]* by Showboat [^*]*)\*\s*$/, '$1'));
+  }
+  flushNote();
+  return { title, preamble, sections };
+}
+
+function execCount(items) {
+  return items.filter(it => it.type === 'code' && it.code != null && it.output != null).length;
+}
+
+function renderNotebookItems(items) {
+  return items.map(it => {
+    if (it.type === 'note') return `<p class="ev-note">${esc(it.text)}</p>`;
+    let h = '<div class="ev-block">';
+    if (it.code != null) h += `<div class="ev-lang">${esc(it.lang || 'code')}</div><pre class="ev-code">${esc(it.code)}</pre>`;
+    if (it.output != null) h += `<div class="ev-lang">output</div><pre class="ev-out">${esc(it.output)}</pre>`;
+    return h + '</div>';
+  }).join('');
+}
+
+// Verify status: run-summary.json `evidence` object wins; otherwise infer from
+// evidence-verify.txt (empty = verified, non-empty = changed).
+function evidenceStatusHtml(evSummary, ev) {
+  const s = obj(evSummary);
+  const verifyText = typeof ev.verify === 'string' ? ev.verify : null;
+  const changedInText = verifyText ? (verifyText.match(/^block \d+:/gm) || []).length : 0;
+  let state = 'unknown';
+  let n = null;
+  if (Object.keys(s).length) {
+    if (s.verified === true) state = 'verified';
+    else if (s.verified === false) {
+      state = 'changed';
+      n = toNum(s.changed_blocks) ?? (changedInText || null);
+    }
+  } else if (verifyText != null) {
+    state = verifyText.trim() === '' ? 'verified' : 'changed';
+    n = changedInText || null;
+  }
+  const notVerifiable = typeof ev.notebook === 'string' && /Not verifiable: written without showboat/.test(ev.notebook);
+
+  let html = '<div class="ev-status">';
+  if (state === 'verified') html += '<span class="chip pass">verified</span>';
+  else if (state === 'changed') {
+    html += `<span class="chip fail">${n != null ? esc(`${n} block${n === 1 ? '' : 's'} changed`) : 'verify failed'}</span>`;
+  } else {
+    html += `<span class="chip unknown">${notVerifiable ? 'not verifiable (written without showboat)' : 'not verified'}</span>`;
+  }
+  const meta = [];
+  if (s.blocks != null) meta.push(`${fmtVal(s.blocks)} blocks`);
+  if (!isEmpty(s.verified_at)) meta.push(`verified at ${fmtVal(s.verified_at)}`);
+  if (!isEmpty(ev.notebook_path || s.notebook)) meta.push(`<code>${fmtVal(ev.notebook_path || s.notebook)}</code>`);
+  if (!isEmpty(ev.verify_path || s.log)) meta.push(`log <code>${fmtVal(ev.verify_path || s.log)}</code>`);
+  if (meta.length) html += ` <span style="font-size:12px;color:var(--muted)">${meta.join(' · ')}</span>`;
+  if (state === 'changed') {
+    html += verifyText != null && verifyText.trim()
+      ? `<pre class="ev-verify">${esc(verifyText)}</pre>`
+      : '<p class="empty">evidence-verify.txt not found or empty.</p>';
+  }
+  if (ev.notebook_truncated) html += '<p class="load-error">evidence.md was larger than 2 MB and is truncated.</p>';
+  if (ev.verify_truncated) html += '<p class="load-error">evidence-verify.txt was larger than 2 MB and is truncated.</p>';
+  return html + '</div>';
+}
+
+function renderEvidence(evSummary, ev) {
+  const sectionEl = document.getElementById('evidence-section');
+  ev = obj(ev);
+  const hasNotebook = typeof ev.notebook === 'string';
+  if (!hasNotebook && isEmpty(obj(evSummary)) && ev.verify == null) { sectionEl.hidden = true; return; }
+  sectionEl.hidden = false;
+
+  let html = evidenceStatusHtml(evSummary, ev);
+  if (!hasNotebook) {
+    html += '<p class="empty">evidence.md not found in the run directory.</p>';
+  } else {
+    const nb = parseNotebook(ev.notebook);
+    EVIDENCE_SECTIONS = nb.sections.map(sec => sec.heading);
+    if (nb.title) html += `<div class="ev-title">${esc(nb.title)}</div>`;
+    if (nb.preamble.items.length) html += `<div class="ev-body">${renderNotebookItems(nb.preamble.items)}</div>`;
+    const openAll = nb.sections.length <= 3;
+    html += nb.sections.map((sec, i) => {
+      const n = execCount(sec.items);
+      return `<details class="ev-sec" id="ev-sec-${i}"${openAll ? ' open' : ''}>
+        <summary>${esc(sec.heading)}<span class="count">${n} block${n === 1 ? '' : 's'}</span></summary>
+        <div class="ev-body">${renderNotebookItems(sec.items) || '<span class="empty">Empty section.</span>'}</div>
+      </details>`;
+    }).join('');
+  }
+  document.getElementById('evidence').innerHTML = html;
+}
+
+function escapeRegExp(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function skillSectionIndex(skill) {
+  const re = new RegExp('(^|[^a-z0-9-])' + escapeRegExp(skill) + '($|[^a-z0-9-])', 'i');
+  return EVIDENCE_SECTIONS.findIndex(h => re.test(h));
+}
+
+function headingSectionIndex(heading) {
+  const h = String(heading || '').replace(/^#+\s*/, '').trim();
+  if (!h) return -1;
+  let i = EVIDENCE_SECTIONS.findIndex(x => x.trim() === h);
+  if (i < 0) i = EVIDENCE_SECTIONS.findIndex(x => x.includes(h) || h.includes(x));
+  return i;
+}
+
+function openEvidenceSection(idx) {
+  const el = idx >= 0 ? document.getElementById('ev-sec-' + idx) : null;
+  const target = el || document.getElementById('evidence-section');
+  if (!target || target.hidden) return;
+  if (el) {
+    el.open = true;
+    el.classList.add('highlight');
+    setTimeout(() => el.classList.remove('highlight'), 2000);
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Capture phase so a click on the chip inside a card header does not also toggle the card.
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('[data-ev-skill],[data-ev-heading]');
+  if (!t) return;
+  e.preventDefault();
+  e.stopPropagation();
+  openEvidenceSection(t.dataset.evSkill != null
+    ? skillSectionIndex(t.dataset.evSkill)
+    : headingSectionIndex(t.dataset.evHeading));
+}, true);
+
+// findings[].evidence entries; kind "notebook" links to its notebook section.
+function evidenceRefs(ev) {
+  const list = Array.isArray(ev) ? ev : (ev == null ? [] : [ev]);
+  return list.map(raw => {
+    if (raw === null || typeof raw !== 'object') return `<div class="ev-ref">${fmtVal(raw)}</div>`;
+    const kind = String(raw.kind || '');
+    if (kind === 'notebook') {
+      const sec = isEmpty(raw.section) ? '' : String(raw.section);
+      const cmd = isEmpty(raw.command) ? '' : String(raw.command);
+      const label = `evidence.md${sec ? ' § ' + sec : ''}${cmd ? ': ' + cmd : ''}`;
+      return `<div class="ev-ref"><a data-ev-heading="${esc(sec)}" title="Open in the evidence notebook">${esc(label)}</a></div>`;
+    }
+    const main = raw.command || raw.ref || '';
+    return `<div class="ev-ref">${kind ? `<span class="tag">${esc(kind)}</span> ` : ''}<code>${fmtVal(main)}</code>${
+      isEmpty(raw.excerpt) ? '' : ` <span style="color:var(--muted)">→ ${fmtVal(raw.excerpt)}</span>`}</div>`;
+  }).join('');
+}
+
+// ── Main init ────────────────────────────────────────────────────────────────
+function init() {
+  const data = EMBEDDED_DATA;
+  if (!data) {
+    document.querySelector('main').innerHTML =
+      '<section><p style="color:var(--nogo);font-weight:600">No data embedded. Run generate_report.py to create a populated report.</p></section>';
+    return;
+  }
+
+  const overall = obj(data.overall);
+  const artifacts = obj(data.artifacts);
+  const files = obj(data.artifact_files);
+  const loadErrors = arr(data.load_errors);
+
+  document.getElementById('header-title').textContent =
+    `ML Run Report — ${overall.run_id || 'unknown'}`;
+  document.getElementById('header-meta').textContent =
+    `Generated ${data.generated_at ? String(data.generated_at).replace('T',' ').slice(0,19) + ' UTC' : ''}`;
+  document.getElementById('header-badge').innerHTML = badge(String(overall.decision || 'PENDING'));
+
+  // Each panel renders independently so one malformed field cannot blank the report.
+  const safely = (fn, elId) => {
+    try { fn(); } catch (e) {
+      const el = document.getElementById(elId);
+      if (el) el.innerHTML = `<p class="load-error">Could not render: ${esc(e && e.message)}</p>`;
+    }
+  };
+  safely(() => renderGateTimeline(overall.gates), 'gate-timeline');
+  safely(() => renderRunStrip(overall, artifacts), 'run-strip');
+  safely(() => renderSummary(overall, artifacts, data.run_dir, loadErrors), 'summary-grid');
+  safely(() => renderMlTestScore(overall.ml_test_score), 'mlts');
+  safely(() => renderSkillCards(artifacts, files), 'skill-cards');
+  safely(() => renderEvidence(overall.evidence, data.evidence), 'evidence');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

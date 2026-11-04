@@ -4,13 +4,32 @@ Scenario 2 (Medium): Telecom Customer Churn
 Business: "Improve retention" — intentionally vague, no metric or horizon stated.
 Data pitfalls:
   - total_charges ≈ monthly_charges × tenure_months (causes multicollinearity / inflated importance)
-  - days_since_last_support_call: elevated for churned customers because their last contact
-    was a cancellation call — subtle temporal leakage
+  - days_since_last_support_call: lower (more recent) for churned customers because their last
+    contact was a cancellation call — subtle temporal leakage
   - senior_citizen: protected attribute, mild performance gap
-  - Label imbalance: ~15% churn
+  - Label imbalance: ~20% churn
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "numpy>=1.24",
+#   "pandas>=2.0",
+# ]
+# ///
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+parser = argparse.ArgumentParser(description=(__doc__ or "").strip().splitlines()[0])
+parser.add_argument(
+    "--out",
+    default=str(Path(__file__).resolve().parent / "data.csv"),
+    help="Output CSV path (default: data.csv next to this script)",
+)
+args = parser.parse_args()
 
 rng = np.random.default_rng(42)
 n = 3000
@@ -61,7 +80,9 @@ df = pd.DataFrame({
     "churned": churned,
 })
 
-df.to_csv("data.csv", index=False)
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+df.to_csv(args.out, index=False)
+print(f"Wrote {args.out}")
 print(f"Rows: {len(df)}  |  Churn rate: {df.churned.mean():.1%}")
 print(f"total_charges vs monthly*tenure correlation: {df.total_charges.corr(df.monthly_charges * df.tenure_months):.4f}")
 print(df.head())

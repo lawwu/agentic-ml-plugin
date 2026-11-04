@@ -1,7 +1,7 @@
 {
   "name": "agentic-ml",
-  "description": "Skills for machine learning workflows: monitoring training runs, debugging models, and managing experiments.",
-  "version": "0.3.0",
+  "description": "Skills for the end-to-end ML lifecycle: target review, dataset audits, baselines, experiment planning, training supervision, failure diagnosis, evaluation, explainability, and Go/No-Go gating.",
+  "version": "0.4.0",
   "author": {
     "name": "Lawrence Wu"
   }

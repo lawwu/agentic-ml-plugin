@@ -1,7 +1,7 @@
 ---
 name: recommend-new-approaches
 description: Recommend new research approaches, modeling ideas, and loss function modifications after a training run completes. Use this skill whenever you want to know what to try next, get modeling improvement suggestions, explore research ideas, suggest architecture changes, propose loss function modifications, or brainstorm next experiments based on the trained model and its metrics. Invoke automatically at the end of orchestrate-e2e or after check-eval to close the loop on every run with actionable next steps. Also use when the user asks "what should I try next?", "how can I improve this model?", "what experiments should I run?", or "what are some ideas to improve performance?".
-argument-hint: "[--out-dir DIR] [--run-id ID] [--model PATH] [--eval-results PATH] [--train-results PATH] [--explain-results PATH] [--task-description TEXT] [--autoresearch]"
+argument-hint: "[--out-dir DIR] [--run-id ID] [--model PATH] [--eval-results PATH] [--train-results PATH] [--explain-results PATH] [--task-description TEXT] [--autoresearch] [--level junior|senior|staff]"
 ---
 
 # Recommend New Approaches
@@ -19,9 +19,16 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 - `--train-results PATH` — path to `train-model.json` (default: `<out-dir>/train-model.json`)
 - `--explain-results PATH` — path to `explain-model.json` (default: `<out-dir>/explain-model.json`)
 - `--task-description TEXT` — plain-language description of the task and business context (augments artifact data)
-- `--autoresearch` — if set, attempt to use [autoresearch](https://github.com/karpathy/autoresearch) for automated literature-grounded suggestions (requires `autoresearch` installed)
+- `--autoresearch` — if set, prepare an [autoresearch](https://github.com/karpathy/autoresearch) setup to test the recommendations that fit its short, fixed-budget experiment loop (see step 4)
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: top 3 ideas with step-by-step how-to.
+- `staff`: portfolio view — expected value per unit of effort, and what to stop doing.
 
 ## Your responsibilities
 
@@ -73,15 +80,16 @@ For each recommendation:
 
 Sort all recommendations by `expected_impact` descending, breaking ties by `effort` ascending (high impact + low effort first).
 
-### 4. Optionally run autoresearch
+### 4. Optionally prepare an autoresearch loop
 
-If `--autoresearch` is set, read the [autoresearch](https://github.com/karpathy/autoresearch) repo and attempt to use it to run some of the recommendations you generated if they fit the autoresearch use case (iterations that take less than 5 mins but can run many of them)
+[autoresearch](https://github.com/karpathy/autoresearch) is not a literature-search tool. It is an agent loop: a coding agent repeatedly edits one training script (`train.py`), trains for a fixed ~5-minute budget, keeps the change if the validation metric improves, and repeats — roughly 12 experiments an hour. The reference setup trains a small GPT on a single NVIDIA GPU and is steered by a human-written `program.md`.
 
-```bash
-uv run autoresearch "<task description derived from artifacts>" --max-papers 10 --output <out-dir>/autoresearch-results.json
-```
+If `--autoresearch` is set:
 
-Parse the results and merge any literature-grounded suggestions into the recommendation list, tagging them with `"source": "autoresearch"`. If `autoresearch` is unavailable or fails, log a warning and continue with artifact-only recommendations.
+1. **Check fit.** A recommendation fits only if it can be tested by editing a single training script and running a short fixed-budget experiment scored by one scalar validation metric. Many `training`, `regularization`, and `loss` ideas fit; data-collection, labeling, and target-definition ideas do not. If nothing fits, say so and skip this step.
+2. **Prepare, don't launch.** Write `<out-dir>/autoresearch/program.md`, modeled on autoresearch's own `program.md`: the metric to optimize and its direction, the one file the agent may edit, the per-experiment time budget, what must not change (data split, evaluation code), and the shortlisted recommendations to try first.
+3. **Surface the launch as `needs-approval`.** autoresearch runs a coding agent unattended with permissions disabled and uses GPU time, so starting it is the user's decision. Put the setup and launch steps in `next_commands` and the report; do not run them.
+4. Set `autoresearch_used: true` and `autoresearch_path` to the `program.md` path. If the user points you at results from a previous autoresearch run, fold its kept/discarded experiments into the recommendations with `"source": "autoresearch"`.
 
 Even without `--autoresearch`, you may draw on your knowledge of relevant ML literature to support recommendations — cite paper names or techniques by name where helpful.
 
@@ -111,6 +119,13 @@ Confidence: medium
 
 Use `CONDITIONAL` as the decision (these are forward-looking suggestions, not a hard gate). Use `GO` if the model already looks strong and only minor improvements remain.
 
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- for the top 3 recommendations: an `exec` block printing the artifact value each is grounded in (e.g. `best_iteration` from `train-model.json`, a flagged slice from `check-eval.json`)
+- when an autoresearch `program.md` was prepared: a note with its path (never executed)
+
 ### JSON artifact
 
 Write `recommend-new-approaches.json` to `--out-dir` (or `./` if invoked standalone) following the schema in [../../references/schemas.md](../../references/schemas.md). Use vocabulary from [../../references/vocabulary.md](../../references/vocabulary.md).
@@ -128,7 +143,7 @@ Key fields to populate:
 ## Example session
 
 ```
-/ml-skills:recommend-new-approaches --out-dir ./reports/run-001
+/agentic-ml:recommend-new-approaches --out-dir ./reports/run-001
 
 Loading artifacts from ./reports/run-001:
   ✓ train-model.json — eval_loss=0.312, eval_f1=0.891 (early stopped at step 3200, patience=3)
@@ -171,7 +186,7 @@ Artifact: ./reports/run-001/recommend-new-approaches.json
 
 ## Additional resources
 
-- [autoresearch](https://github.com/karpathy/autoresearch) — automated literature-grounded research ideation
+- [autoresearch](https://github.com/karpathy/autoresearch) — agent loop that runs short fixed-budget training experiments against a single editable training script
 - [check-eval](../check-eval/SKILL.md) — evaluation results (primary input)
 - [explain-model](../explain-model/SKILL.md) — feature importance and bias (supporting input)
 - [train-model](../train-model/SKILL.md) — training artifacts (supporting input)

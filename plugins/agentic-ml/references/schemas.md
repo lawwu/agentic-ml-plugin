@@ -10,8 +10,9 @@ All artifacts share these top-level fields:
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "skill_name": "<kebab-case skill name>",
+  "level": "junior | senior | staff",
   "run_id": "<uuid or timestamp-slug shared across the orchestrated run>",
   "timestamp": "<ISO-8601 UTC>",
   "duration_seconds": 42.3,
@@ -27,7 +28,18 @@ All artifacts share these top-level fields:
       "fix": "<recommended action>"
     }
   ],
-  "next_commands": ["<exact shell command>"]
+  "next_commands": ["<exact shell command>"],
+  "evidence_notebook": "<out-dir>/evidence.md",
+  "evidence_blocks": 3,
+  "provenance": {
+    "created_at": "<ISO-8601 UTC>",
+    "git": {"sha": "<sha>", "dirty": false, "branch": "<branch>"},
+    "env": {"python": "3.12.4", "packages": {"scikit-learn": "1.6.1"}},
+    "lockfiles": [{"path": "uv.lock", "sha256": "<sha256>"}],
+    "data": [{"path": "<path>", "bytes": 1234, "sha256": "<sha256>"}],
+    "seed": 42,
+    "split_manifest": {"path": "<out-dir>/splits/split-manifest.json", "test_keys_sha256": "<sha256>"}
+  }
 }
 ```
 
@@ -37,6 +49,11 @@ All artifacts share these top-level fields:
 - `decision`: required for all skills; use `GO` when no gate decision applies (e.g., babysit-training completing successfully)
 - `findings`: empty array `[]` when there are no findings — never omit the field
 - `next_commands`: empty array `[]` when there are no next steps
+- `level`: the resolved user level ([levels.md](levels.md)); it changes communication and autonomy only, never thresholds
+- `provenance`: required for skills that read data or run code (from `scripts/provenance.py`, run with the project's interpreter — e.g. `uv run python`, not `uv run provenance.py`); omit for skills that only read other artifacts
+- `findings[]` may carry `evidence` (`[{"kind": "notebook|command|query|file|stat", "ref": "<evidence.md, command, or path>", "section": "<notebook heading>", "command": "<exec command>", "excerpt": "<short output>"}]`) — include it whenever a finding rests on a computed number; prefer `notebook` entries
+- `evidence_notebook` / `evidence_blocks`: the run's [evidence notebook](evidence-notebook.md) and the number of `exec` blocks this skill added to it
+- Version history: `1.1` added `level`, `provenance`, `evidence_notebook`, and `evidence_blocks`; `1.0` artifacts remain readable
 
 ---
 
@@ -61,7 +78,9 @@ Written to: `<out-dir>/review-target.json`
   ],
   "primary_metric": "<metric name>",
   "promotion_threshold": "<value or description>",
-  "split_strategy": "random | stratified | group-aware | time-based"
+  "split_strategy": "random | stratified | group | time",
+  "split_manifest_path": "<out-dir>/splits/split-manifest.json",
+  "test_keys_sha256": "<sha256 of sorted test row keys>"
 }
 ```
 
@@ -113,11 +132,16 @@ Written to: `<out-dir>/build-baseline.json`
   "baselines": [
     {
       "method": "<name>",
+      "kind": "non-ml | statistical | foundation-model",
       "description": "<what it does>",
+      "rule": {"<param>": "<fitted value>"},
       "score": 0.5,
+      "ci": [0.46, 0.54],
+      "predictions_path": "<out-dir>/predictions/baseline_<method>_val.csv",
       "is_best": true
     }
   ],
+  "split_manifest_path": "<out-dir>/splits/split-manifest.json",
   "best_baseline": "<method name>",
   "best_score": 0.5
 }
@@ -145,7 +169,9 @@ Written to: `<out-dir>/check-dataset-quality.json`
   "blocker_count": 0,
   "high_count": 1,
   "medium_count": 2,
-  "low_count": 3
+  "low_count": 3,
+  "data_contract_path": "<out-dir>/data-contract.json",
+  "training_profile_path": "<out-dir>/training-profile.json"
 }
 ```
 
@@ -219,7 +245,7 @@ Written to: `<out-dir>/babysit-training.json`
 {
   "target": "<log path, PID, or cloud job ID>",
   "target_type": "local-log | remote-log | pid | vertex-pipeline | vertex-training | wandb | mlflow",
-  "terminal_state": "SUCCEEDED | FAILED | CANCELLED | TIMEOUT",
+  "terminal_state": "SUCCEEDED | FAILED | CANCELLED | TIMEOUT | EARLY_STOPPED",
   "total_steps": 5000,
   "final_metrics": {"loss": 0.342, "eval_f1": 0.881},
   "anomalies_detected": [
@@ -262,6 +288,8 @@ Written to: `<out-dir>/check-failed-run.json`
 }
 ```
 
+`primary_cause_confidence` is the probability that the primary cause is correct. The base `confidence` field must agree with it — see [vocabulary.md](vocabulary.md#confidence).
+
 ---
 
 ### `check-eval`
@@ -271,7 +299,7 @@ Written to: `<out-dir>/check-eval.json`
 ```json
 {
   "checkpoint": "<path or model ID>",
-  "strategy": "hf-trainer | lm-evaluation-harness | custom",
+  "strategy": "tabular | predictions | hf-trainer | lm-evaluation-harness | custom",
   "device": "<device>",
   "dtype": "<dtype>",
   "tasks": ["<task>"],
@@ -281,11 +309,22 @@ Written to: `<out-dir>/check-eval.json`
       "task": "<task>",
       "metric": "<metric>",
       "score": 0.7823,
+      "ci": [0.751, 0.812],
+      "n": 4000,
       "baseline_score": 0.7441,
+      "baseline_ci": [0.712, 0.775],
       "delta": 0.0382,
+      "delta_ci": [0.012, 0.064],
       "regressed": false
     }
   ],
+  "protocol": {"split": "val | test", "final": false, "test_keys_sha256_match": null, "test_evaluations": 0},
+  "calibration": {"brier": 0.081, "ece": 0.019},
+  "operating_point": {"threshold": 0.32, "precision": 0.58, "recall": 0.63, "flagged_rate": 0.004},
+  "slices": [
+    {"col": "<column>", "value": "<value>", "n": 412, "point": 0.71, "ci": [0.64, 0.78], "flagged": false}
+  ],
+  "eval_metrics_path": "<out-dir>/eval-metrics-val.json",
   "regressions": ["<metric name>"],
   "best_gain": {"metric": "<name>", "delta": 0.038},
   "notes": ["<warning or observation>"]
@@ -321,7 +360,7 @@ Written to: `<out-dir>/explain-model.json`
     }
   ],
   "unexpected_patterns": [
-    {"pattern": "<description>", "severity": "blocker | warning | info", "action": "<text>"}
+    {"pattern": "<description>", "severity": "blocker | high | medium | low", "action": "<text>"}
   ],
   "model_card_path": "<out-dir>/MODEL_CARD.md",
   "caveats": ["<caveat>"]
@@ -340,12 +379,13 @@ Written to: `<out-dir>/train-model.json`
   "hyperparameters": {"lr": 1e-4, "batch_size": 32},
   "early_stopping": {
     "enabled": true,
+    "native": true,
     "metric": "eval_loss",
     "patience": 5,
     "triggered": false,
     "triggered_at_step": null
   },
-  "terminal_state": "SUCCEEDED | FAILED | EARLY_STOPPED | CANCELLED",
+  "terminal_state": "SUCCEEDED | FAILED | EARLY_STOPPED | CANCELLED | TIMEOUT",
   "total_steps": 5000,
   "total_epochs": 3,
   "final_metrics": {"eval_loss": 0.312, "eval_f1": 0.891},
@@ -354,7 +394,14 @@ Written to: `<out-dir>/train-model.json`
     {"path": "<path>", "step": 1000, "metrics": {"eval_loss": 0.420}}
   ],
   "training_duration_seconds": 6180,
-  "babysit_training_ref": "<out-dir>/babysit-training.json"
+  "babysit_training_ref": "<out-dir>/babysit-training.json",
+  "seed": 42,
+  "preflight": [
+    {"check": "init-loss | overfit-one-batch | save-resume | sample-fit | non-constant-predictions | feature-count | too-good-to-be-true", "result": "pass | fail | skipped", "detail": "<text>"}
+  ],
+  "sweep": {"trials": 40, "best_value": 0.812, "best_params": {"<param>": "<value>"}, "objective": "val | cv"},
+  "provenance_path": "<out-dir>/provenance-train.json",
+  "tracking_url": "<MLflow/W&B run URL or null>"
 }
 ```
 
@@ -380,6 +427,10 @@ Written to: `<out-dir>/demonstrate-value.json`
     }
   ],
   "presentation_path": "<out-dir>/value-demo.html",
+  "evidence_verified": true,
+  "assumptions": [
+    {"input": "<name>", "value": "<value>", "source": "user-provided | assumed"}
+  ],
   "presentation_sections": ["Problem", "Baseline", "Model Performance", "Key Drivers", "Business Impact", "Risks and Caveats", "Recommendation"],
   "showboat_version": "<version or null>",
   "inputs_used": {
@@ -418,8 +469,71 @@ Written to: `<out-dir>/recommend-new-approaches.json`
     }
   ],
   "autoresearch_used": false,
-  "autoresearch_path": null,
+  "autoresearch_path": "<out-dir>/autoresearch/program.md or null",
   "artifacts_used": ["<path1>", "<path2>"]
+}
+```
+
+---
+
+### `select-approach`
+
+Written to: `<out-dir>/select-approach.json`
+
+```json
+{
+  "problem_type": "<plain-language description>",
+  "recommended_approach": "no-ml | supervised | forecasting | unsupervised | embeddings | llm-prompting | llm-fine-tuning | preference-rl-tuning | agent",
+  "candidates": [
+    {
+      "approach": "<approach ID>",
+      "fit": "high | medium | low",
+      "rationale": "<why>",
+      "data_needed": "<what data and whether it exists>",
+      "eval_method": "<how it will be evaluated>",
+      "est_cost": "<build and run cost>",
+      "risks": ["<risk>"]
+    }
+  ],
+  "ruled_out": [{"approach": "<approach ID>", "reason": "<why>"}],
+  "constraints": {
+    "labels_available": "<description>",
+    "data_volume": "<description>",
+    "latency": "<description>",
+    "explainability": "<description>",
+    "data_egress_allowed": true,
+    "compute": "<description>"
+  },
+  "what_would_change_this": ["<evidence that would flip the recommendation>"],
+  "lifecycle_map": {
+    "applies": ["<skill>"],
+    "skipped": [{"skill": "<skill>", "reason": "<why>"}],
+    "not_covered": ["<capability the plugin does not provide for this approach>"]
+  }
+}
+```
+
+---
+
+### `check-deployment-readiness`
+
+Written to: `<out-dir>/check-deployment-readiness.json`
+
+```json
+{
+  "model_path": "<path>",
+  "package_format": "joblib | mlflow | onnx | hf | hosted",
+  "signature_path": "<out-dir>/model/signature.json",
+  "serving_mode": "batch | online",
+  "parity": {"n": 1000, "max_abs_diff": 0.0, "n_mismatch": 0, "parity_pass": true},
+  "latency": {"p50_ms": 1.2, "p95_ms": 2.0, "p99_ms": 3.1, "budget_ms": 50, "pass": true},
+  "throughput_rows_per_s": 50000,
+  "model_size_mb": 3.2,
+  "peak_rss_mb": 410,
+  "contract_check": {"violations": 0, "blockers": 0},
+  "drift_baseline_path": "<out-dir>/training-profile.json",
+  "monitoring_plan_path": "<out-dir>/monitoring-plan.md",
+  "rollout": {"strategy": "shadow -> canary -> full", "rollback_criteria": "<text>"}
 }
 ```
 
@@ -436,16 +550,27 @@ Written to: `<out-dir>/run-summary.json`
   "label_col": "<col>",
   "primary_metric": "<metric>",
   "budget_hours": 10,
+  "level": "junior | senior | staff",
+  "autonomy": "review-every-gate | review-key-gates | autonomous",
+  "approach": "<approach ID>",
   "gates": [
     {
-      "gate_number": 1,
-      "gate_name": "review-target | plan-experiment | build-baseline | check-dataset-quality | check-data-pipeline | feature-engineer | train-model | babysit-training | check-failed-run | check-eval | explain-model | demonstrate-value",
+      "gate_number": "0-10, or \"4b\"",
+      "gate_name": "select-approach | review-target | check-dataset-quality | build-baseline | plan-experiment | feature-engineer | check-data-pipeline | train-model | babysit-training | check-failed-run | check-eval | explain-model | check-deployment-readiness | demonstrate-value | recommend-new-approaches",
       "status": "PASS | FAIL | SKIPPED | PENDING",
       "artifact_path": "<out-dir>/<skill-name>.json",
       "timestamp": "<ISO-8601>",
       "decision": "GO | NO-GO | CONDITIONAL"
     }
   ],
+  "final_test": {"metric": "<metric>", "point": 0.79, "ci": [0.75, 0.83], "delta": 0.11, "delta_ci": [0.07, 0.15], "test_keys_sha256_match": true},
+  "evidence": {"notebook": "<out-dir>/evidence.md", "blocks": 24, "verified": true, "verified_at": "<ISO-8601>", "changed_blocks": 0, "log": "<out-dir>/evidence-verify.txt"},
+  "signed_off_by": "<user>",
+  "signed_off_at": "<ISO-8601>",
+  "ml_test_score": {
+    "data": 2.5, "model": 3.0, "infra": 2.0, "monitoring": 1.5, "final": 1.5,
+    "items": [{"section": "data | model | infra | monitoring", "test": "<id and name>", "points": 0.5, "evidence": "<path, or planned/not assessed>"}]
+  },
   "report_path": "<out-dir>/report.html",
   "top_blockers": ["<blocker description>"],
   "top_risks": ["<risk description>"]
@@ -470,7 +595,7 @@ Written to: `<out-dir>/run-summary.json`
   "summary": "<one-line summary>",
   "findings": [],
   "next_commands": [],
-  "selected_scenario": "hard-fraud | hard-attrition | xhard-churn",
+  "selected_scenario": "hard-fraud | hard-readmission | xhard-churn",
   "scenario_detection": "auto | user-forced",
   "modes": ["no-plugin", "plugin", "automl"],
   "runs_per_cell": 1,

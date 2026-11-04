@@ -61,8 +61,9 @@ jobs:
             RANGE="HEAD"
           fi
 
-          # Collect commits: "<hash> <subject>"
-          git log "$RANGE" --pretty=format:"%H %s" > /tmp/commits.txt
+          # Collect commits: "<hash> <subject>". tformat ends every line (including the
+          # last) with a newline, so `while read` below does not drop the oldest commit.
+          git log "$RANGE" --pretty=tformat:"%H %s" > /tmp/commits.txt
 
           # Buckets
           SKILLS="" DOCS="" FIXES="" CHORES="" OTHER=""

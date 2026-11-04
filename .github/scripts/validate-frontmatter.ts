@@ -10,7 +10,7 @@
 
 import { parse as parseYaml } from "yaml";
 import { readdir, readFile } from "fs/promises";
-import { basename, join, relative, resolve } from "path";
+import { basename, dirname, join, relative, resolve } from "path";
 
 // Characters that require quoting in YAML values when unquoted:
 // {} [] flow indicators, * anchor/alias, & anchor, # comment,
@@ -31,6 +31,11 @@ function quoteSpecialValues(text: string): string {
     if (match) {
       const [, key, value] = match;
       if (!key || !value) {
+        result.push(line);
+        continue;
+      }
+      // Leave block scalar indicators (description: > / |- ...) for the YAML parser
+      if (/^[|>][+-]?$/.test(value.trim())) {
         result.push(line);
         continue;
       }
@@ -123,15 +128,52 @@ function validateAgent(
   return issues;
 }
 
+// Agent Skills spec limits: https://agentskills.io/specification
+const SKILL_NAME_MAX = 64;
+const SKILL_DESCRIPTION_MAX = 1024;
+const SKILL_NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 function validateSkill(
-  frontmatter: Record<string, unknown>
+  frontmatter: Record<string, unknown>,
+  filePath: string
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const dirName = basename(dirname(filePath));
 
-  if (!frontmatter["description"] && !frontmatter["when_to_use"]) {
+  const name = frontmatter["name"];
+  if (typeof name !== "string" || name.trim() === "") {
+    issues.push({ level: "error", message: 'Missing required "name" field' });
+  } else {
+    if (name !== dirName) {
+      issues.push({
+        level: "error",
+        message: `"name" (${name}) must match the skill directory name (${dirName})`,
+      });
+    }
+    if (name.length > SKILL_NAME_MAX) {
+      issues.push({
+        level: "error",
+        message: `"name" is ${name.length} chars; max is ${SKILL_NAME_MAX}`,
+      });
+    }
+    if (!SKILL_NAME_PATTERN.test(name)) {
+      issues.push({
+        level: "error",
+        message: `"name" must be lowercase letters, digits and single hyphens (got "${name}")`,
+      });
+    }
+  }
+
+  const description = frontmatter["description"];
+  if (typeof description !== "string" || description.trim() === "") {
     issues.push({
       level: "error",
       message: 'Missing required "description" field',
+    });
+  } else if (description.length > SKILL_DESCRIPTION_MAX) {
+    issues.push({
+      level: "error",
+      message: `"description" is ${description.length} chars; max is ${SKILL_DESCRIPTION_MAX}`,
     });
   }
 
@@ -226,7 +268,16 @@ async function main() {
 
   for (const { path: filePath, type } of files) {
     const rel = relative(baseDir, filePath);
-    const content = await readFile(filePath, "utf-8");
+    let content: string;
+    try {
+      content = await readFile(filePath, "utf-8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        console.log(`${rel}: skipped (file does not exist; deleted or renamed?)\n`);
+        continue;
+      }
+      throw err;
+    }
     const result = parseFrontmatter(content);
 
     const issues: ValidationIssue[] = [];
@@ -241,7 +292,7 @@ async function main() {
           issues.push(...validateAgent(result.frontmatter));
           break;
         case "skill":
-          issues.push(...validateSkill(result.frontmatter));
+          issues.push(...validateSkill(result.frontmatter, filePath));
           break;
         case "command":
           issues.push(...validateCommand(result.frontmatter));

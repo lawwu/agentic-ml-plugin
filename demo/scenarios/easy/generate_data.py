@@ -2,10 +2,29 @@
 Scenario 1 (Easy): Premium Subscription Upgrade Prediction
 -----------------------------------------------------------
 Business: Predict whether a free-tier user will upgrade to premium in the next 30 days.
-Data: Clean, no leakage, ~28% positive rate, no protected attribute concerns.
+Data: Clean, no leakage, ~31% positive rate, no protected attribute concerns.
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "numpy>=1.24",
+#   "pandas>=2.0",
+# ]
+# ///
+
+import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+parser = argparse.ArgumentParser(description=(__doc__ or "").strip().splitlines()[0])
+parser.add_argument(
+    "--out",
+    default=str(Path(__file__).resolve().parent / "data.csv"),
+    help="Output CSV path (default: data.csv next to this script)",
+)
+args = parser.parse_args()
 
 rng = np.random.default_rng(42)
 n = 1200
@@ -39,6 +58,8 @@ df = pd.DataFrame({
     "will_upgrade": will_upgrade,
 })
 
-df.to_csv("data.csv", index=False)
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+df.to_csv(args.out, index=False)
+print(f"Wrote {args.out}")
 print(f"Rows: {len(df)}  |  Positive rate: {df.will_upgrade.mean():.1%}")
 print(df.head())

@@ -1,7 +1,7 @@
 ---
 name: check-data-pipeline
-description: Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, value range, padding, special token, label encoding, and collation issues before full training. Writes inline validation code tailored to your pipeline. Invoke this automatically whenever someone is about to start a training run, has changed their dataset or model, or mentions tokenization, padding, shape errors, or collation problems — even if they don't explicitly ask for pipeline validation. Shape/dtype mismatches and label shifts are the most common silent failures in ML pipelines and should always be caught before committing to a full run.
-argument-hint: "[pipeline-script | notebook | --framework hf|torch|tf|jax] [--model MODEL_NAME_OR_PATH] [--sample N] [--task classification|regression|language-modeling|seq2seq|token-classification]"
+description: Dry-run a preprocessing pipeline on a small sample to catch shape, dtype, value range, padding, special token, label encoding, and collation issues before full training — and, for tabular pipelines (scikit-learn, LightGBM, XGBoost, pandas), preprocessing fit outside the training split, target-encoding and resampling leakage, unseen categories, and training/serving column mismatches. Writes inline validation code tailored to your pipeline. Invoke this automatically whenever someone is about to start a training run, has changed their dataset or model, or mentions tokenization, padding, shape errors, or collation problems — even if they don't explicitly ask for pipeline validation. Shape/dtype mismatches and label shifts are the most common silent failures in ML pipelines and should always be caught before committing to a full run.
+argument-hint: "[pipeline-script | notebook | --framework hf|torch|tf|jax|sklearn|lightgbm|xgboost|catboost|pandas] [--model MODEL_NAME_OR_PATH] [--sample N] [--task classification|regression|language-modeling|seq2seq|token-classification] [--out-dir DIR] [--run-id ID] [--level junior|senior|staff]"
 ---
 
 # Check Data Pipeline
@@ -14,12 +14,19 @@ Arguments (`$ARGUMENTS`) are interpreted as:
 
 - `path/to/preprocess.py` — data preprocessing script to inspect and instrument
 - `path/to/notebook.ipynb` — notebook containing pipeline code
-- `--framework hf|torch|tf|jax` — framework driving the pipeline
+- `--framework hf|torch|tf|jax|sklearn|lightgbm|xgboost|catboost|pandas` — framework driving the pipeline (tabular frameworks use the tabular checks in step 4)
 - `--model MODEL` — model name or path (used to load tokenizer for token-level checks)
 - `--sample N` — number of examples to run through (default: 32)
 - `--task` — task type to select appropriate validation targets
 
 Target: `$ARGUMENTS`
+
+## Adapt to the user's level
+
+Resolve the level (`--level`, then `.claude/agentic-ml.local.md`, else `senior`) and follow [../../references/levels.md](../../references/levels.md). Level changes explanation depth, pauses, and how much you build versus review — never the checks, thresholds, or approval rules. Record `level` in the JSON artifact.
+
+- `junior`: explain each failing check and show the fix inline.
+- `staff`: audit mode on their pipeline code; report deltas only.
 
 ## Your responsibilities
 
@@ -32,7 +39,10 @@ Read the provided script or notebook. Identify:
 - Output collation (DataCollator, custom collate_fn, tf.data batching)
 - Framework and model type
 
-If no script is provided, ask the user to describe or paste the core preprocessing code before proceeding.
+If no script is provided:
+
+- For tabular data with `train_tabular.py` from `train-model`, check that scaffold's pipeline.
+- Otherwise, ask the user to describe or paste the core preprocessing code before proceeding.
 
 ### 2. Write inline validation code
 
@@ -99,6 +109,16 @@ See [references/pipeline-checks.md](references/pipeline-checks.md) for full spec
 - `DataLoader` with `num_workers > 0` produces deterministic output for the same seed
 - No Python objects (lists, dicts) leaking into the batch (would break distributed)
 
+**Tabular pipelines** (scikit-learn, LightGBM, XGBoost, CatBoost, pandas) — full specs and code in [references/tabular-pipeline-checks.md](references/tabular-pipeline-checks.md):
+
+- Every fitted transform (imputer, scaler, encoder, feature selector) is fit on `train` only, ideally inside an sklearn `Pipeline` / `ColumnTransformer`. A `.fit` or `.fit_transform` on the full data before the split is a blocker.
+- Target encoding uses out-of-fold values on `train`. Encoding fit on rows that include the scored row is a blocker.
+- Resampling (SMOTE, under/over-sampling) happens inside each training fold, never before the split.
+- Unseen categories at inference are handled (`handle_unknown="ignore"` or an explicit `__other__` bucket).
+- The feature columns, order, and dtypes at inference match training and the data contract (`data-contract.json` from `check-dataset-quality`). No id, timestamp, or label column is a feature unless intended.
+- Missing values are handled identically in training and inference code paths.
+- Splits used by the pipeline are the ones in `<out-dir>/splits/`, and no `test` rows are read.
+
 ### 5. Report format
 
 ```text
@@ -128,6 +148,13 @@ Next steps:
 Decision: GO | NO-GO
 Confidence: high|medium|low
 ```
+
+### Record evidence
+
+Append this skill's section to `<out-dir>/evidence.md` following [../../references/evidence-notebook.md](../../references/evidence-notebook.md): create it with `showboat init` if it does not exist, pass `--workdir <out-dir>`, and keep every `exec` block deterministic, side-effect free, and under about a minute. Set `evidence_notebook` and `evidence_blocks` in the JSON artifact. Record:
+
+- save the validation script as `<out-dir>/pipeline_check.py` and `exec` it (small sample, fixed seed); its pass/fail lines are the evidence
+- for tabular pipelines: the train-only fit check (fitted statistics equal the `train` statistics)
 
 ### JSON artifact
 
@@ -183,7 +210,7 @@ Stop when:
 ## Example
 
 ```text
-/ml-skills:check-data-pipeline preprocess.py --framework hf --model bert-base-uncased --sample 64 --task classification
+/agentic-ml:check-data-pipeline preprocess.py --framework hf --model bert-base-uncased --sample 64 --task classification
 
 Pipeline Validation Report
 ==========================
@@ -206,7 +233,7 @@ Failures:
 Next steps:
 - Fix label dtype cast in preprocess.py:42
 - Fix collate_fn attention_mask logic in preprocess.py:87
-- Re-run: /ml-skills:check-data-pipeline preprocess.py --framework hf --model bert-base-uncased --sample 64 --task classification
+- Re-run: /agentic-ml:check-data-pipeline preprocess.py --framework hf --model bert-base-uncased --sample 64 --task classification
 ```
 
 ## Additional resources

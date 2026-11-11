@@ -8,6 +8,15 @@ The format follows the categories used in the automated release workflow (`.gith
 
 ## [Unreleased]
 
+### 🛠 Skills & Features
+
+- feat: add `build-review-page` skill — one-minute HTML pages for the person approving a gate, one question per page (`decision`, `label`, `split`, `baseline`, `errors`, `value`, `tried`). Every number is bound to a field of a skill artifact; `check_page.py` fails a page that disagrees with its artifacts, is older than them, loads outside files, or runs over the word limit. Each page lists the judgments only a person can make and the conditions under which to distrust it, and reviewer replies are recorded per claim in `review/responses.jsonl`
+- feat: `orchestrate-e2e` builds the `decision` page before each review pause and shows its path on the review card; `report.html` lists `build-review-page`
+
+### 📚 Documentation
+
+- docs: add Review Page and Review Verdict vocabulary; add the `build-review-page` schema and the reviewer-response line format
+
 ---
 
 ## [0.4.0] — 2026-11-04

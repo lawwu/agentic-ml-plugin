@@ -90,7 +90,7 @@ Pass `--out-dir <out-dir> --run-id <run_id> --level <level>` to every sub-skill 
 
 **Evidence**: after each gate, check that its section exists in `evidence.md` and covers its headline numbers and `blocker`/`high` findings. If it is missing, ask the sub-skill to add it before moving on.
 
-**Review pauses**: pause where the autonomy setting requires (see [levels.md](../../references/levels.md#autonomy)). Show the review card and wait for the user. With `review-key-gates`, pause after gate 1, after gate 5 (before training spend), and at gate 10. Every setting pauses on `NO-GO`, on `needs-approval` actions, and at promotion.
+**Review pauses**: pause where the autonomy setting requires (see [levels.md](../../references/levels.md#autonomy)). Before each pause, invoke `build-review-page --gate <n>` and put the path of its `decision` page on the review card; if it returns `NO-GO` or fails, show the card without a page and say why. Show the review card and wait for the user. With `review-key-gates`, pause after gate 1, after gate 5 (before training spend), and at gate 10. Every setting pauses on `NO-GO`, on `needs-approval` actions, and at promotion.
 
 ### 3. Select the approach (gate 0)
 
@@ -285,4 +285,5 @@ Stop when any of these is true:
 - [../../references/levels.md](../../references/levels.md) — levels, autonomy, and the review card
 - [../../references/evaluation-protocol.md](../../references/evaluation-protocol.md) — locked test set, intervals, slices, final evaluation
 - [../../references/evidence-notebook.md](../../references/evidence-notebook.md) — the run's re-runnable evidence notebook
+- [build-review-page](../build-review-page/SKILL.md) — the one-minute pages shown at each review pause
 - [scripts/generate_report.py](scripts/generate_report.py) — builds `report.html` from the run's JSON artifacts

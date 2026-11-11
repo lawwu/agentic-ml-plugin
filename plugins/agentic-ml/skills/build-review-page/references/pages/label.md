@@ -10,7 +10,7 @@ Most wrong models are right about the wrong thing. This page lets a person who k
 
 ## Headline
 
-One sentence in the form: "For each <entity>, at <prediction time>, predict whether <target event> within <horizon>." Use the contract's own words. Do not shorten the event.
+One plain sentence in the form: "At <prediction time>, predict whether <target event> within <horizon>." Say it the way you would to someone outside the team. The contract's exact wording goes in the facts, bound and unshortened, so the reviewer can compare the two.
 
 ## Picture
 
@@ -25,6 +25,7 @@ Below the timeline, place each entry of `leakage_risks` as a labelled tick with 
 
 ## Facts to bind
 
+- The contract word for word: `entity`, `prediction_time`, `target_event`.
 - `label_formula`, in full. This is the sentence the reviewer most needs to read.
 - `primary_metric`, with one clause saying what it measures and what chance looks like.
 - `promotion_threshold`: the bar the model must clear.

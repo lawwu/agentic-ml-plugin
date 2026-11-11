@@ -33,6 +33,8 @@ Target: `$ARGUMENTS`
 | [value](references/pages/value.md) | What does acting at this cutoff cost and gain? | `check-eval.json`, `demonstrate-value.json` | gate 7 |
 | [tried](references/pages/tried.md) | What else was tried, and how many looks were taken? | `select-approach.json`, `plan-experiment.json`, `train-model.json` | gate 4 |
 
+The reference files name fields as [schemas.md](../../references/schemas.md) defines them. A real artifact may name a field differently, hold several result rows, or add fields. Open the artifact, find the field that holds the thing the page needs, and bind to the path that exists. Choose the result row for the metric the promotion bar gates and the split under review. When the page had to depart from the schema's field, say so in one distrust item, because a field with an unexpected name may not mean what the page assumes.
+
 Read the page's reference file before building it. It lists the fields to show, the picture to draw, the questions only a person can answer, and the conditions that must appear under "Distrust this if".
 
 ## Rules for every page
@@ -40,7 +42,7 @@ Read the page's reference file before building it. It lists the fields to show, 
 1. **One question, answered in the headline.** The `<h1>` is the answer in one sentence, not a title.
 2. **The reader is new to this model and has a minute.** Plain words. The first time a metric appears, say what it measures and what a bad value looks like, in one clause.
 3. **Read JSON only.** Use the artifacts in `<out-dir>` and the JSON files they point to (`split-manifest.json`, `eval-metrics-*.json`, `data-contract.json`). Never open data, prediction, or model files to build a page. This keeps the page inside the [evaluation protocol](../../references/evaluation-protocol.md).
-4. **Bind every number.** A number from an artifact is written as `<span data-ref="check-eval.json#/results/0/score" data-fmt=".3f">0.782</span>`. The path after `#` is a JSON pointer. `data-fmt` is a Python format spec; leave it out and the checker accepts the value rounded to the decimals you show.
+4. **Bind every number, and do not type it.** Write a value from an artifact as an empty element: `<span data-ref="check-eval.json#/results/0/score" data-fmt=".3f"></span>`. The path after `#` is a JSON pointer and `data-fmt` is a Python format spec (`.3f`, `.1%`, `,d`, `+.3f`). `check_page.py --fill` writes the value in. Text fields are bound the same way, without `data-fmt`.
 5. **Do no arithmetic.** If no artifact holds the number, the page does not show it. Say what is missing and which skill would produce it. The only exception is counting the items of a list you bind ("3 slices flagged").
 6. **Declare what is not from an artifact.** A constant the reader needs (a regulatory threshold, a conventional cutoff) is written as `<span data-literal="four-fifths rule">0.8</span>`. Use this rarely.
 7. **Show the artifact's decision.** The decision chip is bound to the artifact's `decision`. Never soften a `NO-GO` or `CONDITIONAL` in the headline.
@@ -64,14 +66,14 @@ List the artifacts in `<out-dir>`. For `--page all`, build each page whose requi
 
 Copy `assets/base.html` to `<out-dir>/review/<page>.html` and fill it by following the page's reference file. Take text fields (the label formula, a finding's title, a caveat) from the artifact and bind them too.
 
-### 3. Stamp and check
+### 3. Fill, stamp, and check
 
 ```bash
-uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <out-dir>/review/<page>.html --stamp
+uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <out-dir>/review/<page>.html --fill --stamp
 uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <out-dir>/review/<page>.html --strict
 ```
 
-`--stamp` writes the sha256 of each artifact the page reads into the page. The check then fails when:
+`--fill` writes each artifact value into its empty element. `--stamp` writes the sha256 of each artifact the page reads into the page. The check then fails when:
 
 - a shown value differs from its artifact field, or the field does not exist
 - an artifact changed after the page was stamped

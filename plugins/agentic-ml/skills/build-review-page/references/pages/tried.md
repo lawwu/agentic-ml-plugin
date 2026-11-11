@@ -46,7 +46,8 @@ Planned candidates that were never run stay visible and are marked "not run". Bi
 - `sweep/objective` is neither `val` nor `cv`.
 - `protocol/test_evaluations` is above one.
 - There were many tuning runs and the gain's interval on the baseline page barely clears zero.
-- A planned candidate was not run and nothing says why.
+- A planned candidate was not run and nothing says why, or a model was trained that was not in the plan.
+- The chosen model leads the runner-up by less than the noise in either score.
 - A `preflight` check has result `fail` or `skipped`.
 - `terminal_state` is not `SUCCEEDED` or `EARLY_STOPPED`.
 - `ruled_out` is empty: no alternative was considered on record.

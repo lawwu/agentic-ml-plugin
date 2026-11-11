@@ -26,7 +26,7 @@ Decide from `delta_ci`, for a metric where higher is better (reverse for an erro
 Two panels sharing the page width.
 
 1. **Scores.** One row per baseline and one for the model, on a single axis in the metric's units. Each row is a dot at the score with a line across its interval. Label each row with the method name and its score. The model row is last and stands out.
-2. **The gap.** One dot at `delta` with a line across `delta_ci`, on an axis that includes zero, with zero drawn as a rule. This panel answers the question; give it room.
+2. **The gap.** One dot at `delta` with a line across `delta_ci`, on an axis that includes zero, with zero drawn as a rule. This panel answers the question; give it room. When the promotion bar gates one metric and the product is run on another, draw a gap row for each and say which one is gated.
 
 Bind the chart to `check-eval.json#/results/0`.
 
@@ -48,7 +48,8 @@ Bind the chart to `check-eval.json#/results/0`.
 ## Distrust this if
 
 - `delta_ci` contains zero.
-- The interval on the gap is wider than the gap itself.
+- The interval on the gap is wider than the gap itself, on any metric shown.
+- The gated metric is not the one the product is run on.
 - `protocol/split` is `val` and `sweep/trials` is large: the best of many tries looks better than it is.
 - `protocol/split` is `test` while `protocol/final` is false.
 - No baseline has kind `non-ml`.

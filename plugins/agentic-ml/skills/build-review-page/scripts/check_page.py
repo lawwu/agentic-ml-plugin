@@ -13,14 +13,16 @@ outside itself, or when it is too long to read in about a minute.
 Usage:
     uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <page.html> [--artifacts DIR] [--max-words 350]
                                                         [--strict] [--json]
-    uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <page.html> --stamp [--artifacts DIR]
+    uv run "${CLAUDE_SKILL_DIR}/scripts/check_page.py" <page.html> --fill --stamp [--artifacts DIR]
 
 --artifacts  folder the data-ref paths are relative to (default: the page's parent's parent, <out-dir>)
---stamp      write the sha256 of every referenced artifact into the page's sources block, then exit
+--fill       write each artifact value into its empty data-ref element, so no number is typed by hand
+--stamp      write the sha256 of every referenced artifact into the page's sources block
 --strict     numbers that are neither bound (data-ref) nor declared (data-literal) fail instead of warn
 --json       print the report as JSON
 
-Exit code 0 when the page passes, 1 when it fails, 2 on a usage error. Reads only; --stamp edits the page.
+Exit code 0 when the page passes, 1 when it fails, 2 on a usage error. Reads only; --fill and --stamp edit
+the page and then exit.
 """
 # /// script
 # requires-python = ">=3.10"
@@ -35,6 +37,7 @@ import json
 import math
 import re
 import sys
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -43,8 +46,9 @@ BLOCKS = ("decision", "ask", "distrust", "sources")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 SOURCES_ID = "review-sources"
 SOURCES_RE = re.compile(r'(<script[^>]*\bid="review-sources"[^>]*>)(.*?)(</script>)', re.S)
-NUMBER_RE = re.compile(r"(?<![\w.])(?<!\w[-−])[-+−]?\d[\d,]*(?:\.\d+)?%?")  # not the 001 of "run-001"
+NUMBER_RE = re.compile(r"(?<![\w.])(?<!\w[-−])[-+−]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?")  # not the 001 of "run-001"
 WORD_RE = re.compile(r"[^\W_]+(?:[-'’.][^\W_]+)*")
+EMPTY_REF_RE = re.compile(r'(<([a-zA-Z][\w-]*)\b[^<>]*\bdata-ref="([^"]+)"[^<>]*>)\s*(</\2>)')
 MISSING = object()
 
 
@@ -321,6 +325,58 @@ def check(page_path: Path, root: Path, max_words: int, strict: bool) -> dict:
             "errors": errors, "warnings": warnings}
 
 
+def fill(page_path: Path, root: Path) -> int:
+    """Write artifact values into empty data-ref elements: <span data-ref="f.json#/a" data-fmt=".3f"></span>."""
+    html = page_path.read_text(encoding="utf-8")
+    docs: dict[str, object] = {}
+    problems: list[str] = []
+    filled = 0
+
+    def put(m: re.Match) -> str:
+        nonlocal filled
+        open_tag, ref = m.group(1), unescape(m.group(3))
+        if "data-chart" in open_tag:
+            return m.group(0)
+        file, pointer = split_ref(ref)
+        path = artifact_path(root, file)
+        if file not in docs:
+            try:
+                docs[file] = json.loads(path.read_text(encoding="utf-8")) if path else MISSING
+            except (OSError, json.JSONDecodeError):
+                docs[file] = MISSING
+        value = MISSING if docs[file] is MISSING else resolve(docs[file], pointer)
+        if value is MISSING:
+            problems.append(f"{ref}: no such file or field")
+            return m.group(0)
+        if isinstance(value, (list, dict)):
+            return m.group(0)
+        fmt = re.search(r'\bdata-fmt="([^"]*)"', open_tag)
+        if isinstance(value, bool) or value is None:
+            text = json.dumps(value)
+        elif isinstance(value, (int, float)):
+            if fmt:
+                try:
+                    text = format(value, fmt.group(1))
+                except (ValueError, TypeError) as e:
+                    problems.append(f"{ref}: bad data-fmt {fmt.group(1)!r}: {e}")
+                    return m.group(0)
+            elif isinstance(value, float):
+                problems.append(f"{ref}: a decimal needs data-fmt (for example .3f or .1%)")
+                return m.group(0)
+            else:
+                text = str(value)
+        else:
+            text = " ".join(str(value).split())
+        filled += 1
+        return open_tag + escape(text, quote=False) + m.group(4)
+
+    page_path.write_text(EMPTY_REF_RE.sub(put, html), encoding="utf-8")
+    for line in problems:
+        print(f"error: {line}", file=sys.stderr)
+    print(f"filled {filled} value(s) in {page_path}")
+    return 1 if problems else 0
+
+
 def stamp(page_path: Path, root: Path) -> int:
     html = page_path.read_text(encoding="utf-8")
     page = Page()
@@ -355,7 +411,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--artifacts", help="folder data-ref paths are relative to (default: the page's parent's parent)")
     ap.add_argument("--max-words", type=int, default=350)
     ap.add_argument("--strict", action="store_true", help="unbound numbers fail instead of warn")
-    ap.add_argument("--stamp", action="store_true", help="write artifact hashes into the sources block and exit")
+    ap.add_argument("--fill", action="store_true", help="write artifact values into empty data-ref elements")
+    ap.add_argument("--stamp", action="store_true", help="write artifact hashes into the sources block")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     page_path = Path(args.page)
@@ -363,8 +420,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {page_path} not found", file=sys.stderr)
         return 2
     root = (Path(args.artifacts) if args.artifacts else page_path.resolve().parent.parent).resolve()
-    if args.stamp:
-        return stamp(page_path, root)
+    if args.fill or args.stamp:
+        code = fill(page_path, root) if args.fill else 0
+        return (stamp(page_path, root) if args.stamp else 0) or code
     report = check(page_path, root, args.max_words, args.strict)
     if args.json:
         print(json.dumps(report, indent=2))

@@ -50,7 +50,7 @@
   footer code { font: 13px var(--mono); overflow-wrap: anywhere; }
   /* Charts are rows of HTML, so labels keep their size on a phone. Positions are percentages of the track. */
   .plot { display: grid; gap: 6px; }
-  .plot h3 { margin: 6px 0 2px; font-size: 15px; font-weight: 600; }
+  figure h3 { margin: 6px 0 4px; font-size: 15px; font-weight: 600; }
   .row { display: grid; grid-template-columns: minmax(84px, 28%) 1fr minmax(52px, auto); align-items: center; gap: 10px; font-size: 15px; }
   .row .v { text-align: right; font-variant-numeric: tabular-nums; }
   .row.model { font-weight: 700; }
@@ -58,10 +58,22 @@
   .iv { position: absolute; top: 50%; left: var(--lo); width: calc(var(--hi) - var(--lo)); height: 3px; margin-top: -1.5px; background: var(--base); }
   .dot { position: absolute; top: 50%; left: var(--at); width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--base); }
   .bar { position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--w); background: var(--model); border-radius: 3px; }
+  .seg { position: absolute; top: 4px; bottom: 4px; left: var(--lo); width: calc(var(--hi) - var(--lo)); background: var(--model); border-radius: 3px; }
   .ref { position: absolute; top: -2px; bottom: -2px; left: var(--at); border-left: 2px dashed var(--flag); }
   .model .iv, .model .dot { background: var(--model); }
   .flagged .iv, .flagged .dot { background: var(--flag); }
   .scale { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 13px; }
+  /* Columns of labelled boxes, for a path or a sequence (.steps), and a strip of small tags (.tags). */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .steps ul, .tags { list-style: none; margin: 0; padding: 0; }
+  .steps ul { display: flex; flex-wrap: wrap; gap: 6px; }
+  .steps li { margin: 0; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 15px; }
+  .steps li.chosen { border: 2px solid var(--model); font-weight: 700; }
+  .steps li.dropped { color: var(--muted); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tags li { margin: 0; padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; }
+  .tags li.now { border: 2px solid var(--ink); font-weight: 700; }
+  .tags i, .steps i { font-style: normal; color: var(--muted); }
   figure svg { display: block; width: 100%; height: auto; }
   @media print { body { background: #fff; } figure, .facts li { break-inside: avoid; } }
 </style>
@@ -71,7 +83,7 @@
   One page, one question, about a minute to read. Keep this order. Rules are in ../SKILL.md; what this
   page type must show is in ../references/pages/<page>.md.
 
-  Every number from an artifact:  <span data-ref="file.json#/json/pointer" data-fmt=".3f">0.782</span>
+  Every value from an artifact, left empty for check_page.py --fill: <span data-ref="file.json#/json/pointer" data-fmt=".3f"></span>
   A number that is not in any artifact (user-provided, assumed): <span data-literal="why">50,000</span>
   A chart: <div class="plot" data-chart data-ref="file.json#/array" aria-label="what it shows">, built from .row
            elements (see the figure below). Value labels inside it are bound like any other number.
@@ -83,7 +95,7 @@
     <p class="eyebrow">The question this page answers, as a question</p>
     <h1>The answer, in one sentence a newcomer can read</h1>
     <p class="verdict">
-      <span class="chip" data-decision="GO" data-ref="SKILL.json#/decision">GO</span>
+      <span class="chip" data-decision="GO" data-ref="SKILL.json#/decision"></span>
       <span>The one reason for that decision.</span>
     </p>
     <p class="meta">Run RUN_ID · gate N · built from SKILL.json</p>
@@ -92,13 +104,13 @@
   <figure>
     <!-- The one picture that answers the question. Labels sit on the rows, not in a legend.
          Each row: a name, a track, a value. On the track: .iv is an interval from lo to hi, .dot a point at at,
-         .bar a share of width w, .ref a reference line at at. Give each as a percentage of the track
+         .bar a share of width w, .seg a block from lo to hi, .ref a reference line at at. Give each as a percentage of the track
          (position = (value - axis min) / (axis max - axis min)). Add class "model" or "flagged" to a row. -->
     <div class="plot" data-chart data-ref="SKILL.json#/FIELD" aria-label="WHAT THE CHART SHOWS">
       <div class="row">
         <span>row name</span>
         <span class="track"><i class="iv" style="--lo:20%;--hi:60%"></i><i class="dot" style="--at:40%"></i></span>
-        <span class="v" data-ref="SKILL.json#/FIELD">0</span>
+        <span class="v" data-ref="SKILL.json#/FIELD" data-fmt=".3f"></span>
       </div>
       <div class="row"><span></span><span class="scale"><span>axis min</span><span>axis max</span></span><span></span></div>
     </div>
@@ -106,7 +118,7 @@
   </figure>
 
   <ul class="facts">
-    <li data-claim="X1"><span class="n" data-ref="SKILL.json#/FIELD">0</span><span class="l">what this number is, in plain words</span></li>
+    <li data-claim="X1"><span class="n" data-ref="SKILL.json#/FIELD" data-fmt=".3f"></span><span class="l">what this number is, in plain words</span></li>
   </ul>
 
   <section data-block="ask">

@@ -238,7 +238,7 @@ gh actions-lock          # relock (needs the gh-actions-lock extension: gh exten
 uvx zizmor .github/      # lint
 ```
 
-Keep comments off `uses:` lines: relocking rewrites those lines and drops anything at their end. Dependabot proposes action updates weekly, after a 7-day cooldown.
+Keep comments off `uses:` lines: relocking rewrites those lines and drops anything at their end. Dependabot proposes action updates weekly, after a 7-day cooldown. Minor and patch updates merge themselves once the required "Actions lock" and "zizmor" checks pass; major updates wait for review.
 
 ## References
 

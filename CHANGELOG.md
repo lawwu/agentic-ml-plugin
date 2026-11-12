@@ -15,7 +15,7 @@ The format follows the categories used in the automated release workflow (`.gith
 
 ### 🔧 Maintenance
 
-- ci: lock GitHub Actions to exact commits with `gh actions-lock` (`.github/workflows/actions.lock`); add an `actions` workflow that verifies the lockfile and runs zizmor on every pull request; add Dependabot for actions with a 7-day cooldown; fix zizmor findings (template injection in `release.yml`, credentials left on disk by checkout, default token permissions)
+- ci: lock GitHub Actions to exact commits with `gh actions-lock` (`.github/workflows/actions.lock`); add an `actions` workflow that verifies the lockfile and runs zizmor on every pull request; add Dependabot for actions with a 7-day cooldown, with auto-merge for minor and patch updates once the required checks pass; fix zizmor findings (template injection in `release.yml`, credentials left on disk by checkout, default token permissions)
 - test: add skill evals under `plugins/agentic-ml/evals/` for `claude plugin eval` — three cases with a planted fact and known right answer (two for `select-approach`, one for `build-review-page`), conventions for writing more, and `summarize.py` for a per-skill table of with-plugin and without-plugin scores, planted and clean pass counts, and cost
 
 ### 📚 Documentation

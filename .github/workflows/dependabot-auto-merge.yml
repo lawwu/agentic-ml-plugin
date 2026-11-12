@@ -1,0 +1,30 @@
+# Turns on auto-merge for Dependabot's grouped GitHub Actions updates, minor and
+# patch only. The pull request still merges only after the required checks on main
+# ("Actions lock" and "zizmor") pass, so an update that leaves actions.lock stale
+# or adds a flagged action stays open. Major updates wait for a person.
+name: dependabot auto-merge
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge
+    runs-on: ubuntu-latest
+    # The PR's author, not github.actor: the actor is whoever last triggered the run.
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'lawwu/agentic-ml-plugin'
+    permissions:
+      # gh pr merge --auto merges the pull request once its checks pass
+      contents: write
+      pull-requests: write
+    steps:
+      - id: metadata
+        uses: dependabot/fetch-metadata@v3.1.0
+      - if: steps.metadata.outputs.package-ecosystem == 'github_actions' && steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}

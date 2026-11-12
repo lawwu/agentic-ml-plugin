@@ -8,17 +8,22 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     permissions:
+      # gh release create makes the tag and the release through the API
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Read version from plugin.json
         id: version
@@ -29,8 +34,10 @@ jobs:
 
       - name: Check if tag already exists
         id: tag_check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if git rev-parse "refs/tags/v${{ steps.version.outputs.version }}" &>/dev/null; then
+          if git rev-parse "refs/tags/v${VERSION}" &>/dev/null; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -38,8 +45,10 @@ jobs:
 
       - name: Abort if tag already exists
         if: steps.tag_check.outputs.exists == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Bump the version in plugin.json before releasing."
+          echo "::error::Tag v${VERSION} already exists. Bump the version in plugin.json before releasing."
           exit 1
 
       - name: Find previous release tag
@@ -52,6 +61,7 @@ jobs:
         id: notes
         env:
           PREV_TAG: ${{ steps.prev_tag.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           # Commit range: from last tag (or root) to HEAD
@@ -153,22 +163,24 @@ jobs:
             echo ""
 
             if [ -n "$PREV_TAG" ]; then
-              echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${{ steps.version.outputs.version }}"
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...v${VERSION}"
             else
-              echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/v${{ steps.version.outputs.version }}"
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/v${VERSION}"
             fi
           } > /tmp/release_notes.md
 
       - name: Create tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           PRERELEASE_FLAG=""
-          if [ "${{ inputs.prerelease }}" = "true" ]; then
+          if [ "$PRERELEASE" = "true" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "agentic-ml ${{ steps.version.outputs.tag }}" \
+          gh release create "$TAG" \
+            --title "agentic-ml $TAG" \
             --notes-file /tmp/release_notes.md \
-            --target "${{ github.sha }}" \
+            --target "$GITHUB_SHA" \
             $PRERELEASE_FLAG

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Action updates wait 7 days after a release, so a hijacked release has time to
+  # be caught. Dependabot updates .github/workflows/actions.lock in the same PR.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ['*']

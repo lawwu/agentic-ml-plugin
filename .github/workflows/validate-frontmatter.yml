@@ -7,13 +7,22 @@ on:
       - '**/skills/*/SKILL.md'
       - '**/commands/*.md'
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # gh pr diff reads the pull request's changed files
+      pull-requests: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2.2.0
 
       - name: Install dependencies
         run: cd .github/scripts && bun install yaml

@@ -229,6 +229,17 @@ Quick path: create `plugins/agentic-ml/skills/<skill-name>/SKILL.md`, add frontm
 claude --plugin-dir ./plugins/agentic-ml
 ```
 
+### GitHub Actions
+
+The workflows are locked: every action is pinned to an exact commit in `.github/workflows/actions.lock`, and the `actions` workflow checks the lockfile and lints the workflows with [zizmor](https://docs.zizmor.sh) on every pull request. After changing a workflow:
+
+```bash
+gh actions-lock          # relock (needs the gh-actions-lock extension: gh extension install github/gh-actions-lock)
+uvx zizmor .github/      # lint
+```
+
+Keep comments off `uses:` lines: relocking rewrites those lines and drops anything at their end. Dependabot proposes action updates weekly, after a 7-day cooldown.
+
 ## References
 
 - [Agent Skills Specification](https://agentskills.io/specification)

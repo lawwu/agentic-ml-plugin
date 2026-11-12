@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: review-page-gain-is-noise
+description: The model's gain over the baseline has an interval that includes zero and the evaluation said NO-GO. The review page must say the model is not shown to be better and must show NO-GO.
+tags: [build-review-page, planted, dev, needs-bash]
+context:
+  scaffold_script: fixture.sh

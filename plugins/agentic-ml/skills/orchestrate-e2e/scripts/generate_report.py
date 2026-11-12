@@ -35,6 +35,7 @@ SKILL_GATES = [
     ("explain-model", 8),
     ("check-deployment-readiness", 9),
     ("demonstrate-value", None),
+    ("build-review-page", None),
     ("recommend-new-approaches", None),
 ]
 SKILL_NAMES = [name for name, _ in SKILL_GATES]

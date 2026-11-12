@@ -4,6 +4,8 @@ docs/
 
 # Reports and run outputs
 reports/
+plugins/agentic-ml/evals/results/
+evals-result.json
 codex-output/
 demo/scenarios/**/*.md
 demo/scenarios/**/*.csv

@@ -120,6 +120,7 @@ The full rules are in [evaluation-protocol.md](plugins/agentic-ml/references/eva
 | 8 | [explain-model](plugins/agentic-ml/skills/explain-model/SKILL.md) | Post-eval | Generate feature importance, bias audit, and model card before promotion |
 | 9 | [check-deployment-readiness](plugins/agentic-ml/skills/check-deployment-readiness/SKILL.md) | Pre-deployment | Training/serving parity, latency and memory budgets, data contract checks, and monitoring, rollout, and rollback plans |
 | — | [demonstrate-value](plugins/agentic-ml/skills/demonstrate-value/SKILL.md) | Post-eval (informational) | Create a business value presentation whose figures are recorded and re-runnable with showboat |
+| — | [build-review-page](plugins/agentic-ml/skills/build-review-page/SKILL.md) | Review (any gate) | Build one-minute HTML pages for the person approving a gate: one question per page, every number bound to a skill artifact and checked by a script, with the judgments only a human can make |
 | — | [recommend-new-approaches](plugins/agentic-ml/skills/recommend-new-approaches/SKILL.md) | Post-eval (informational) | Recommend new research approaches, modeling ideas, and loss function modifications sorted by expected impact; optionally prepares an autoresearch experiment loop |
 | — | [orchestrate-e2e](plugins/agentic-ml/skills/orchestrate-e2e/SKILL.md) | Orchestration | Coordinate the full ML lifecycle (gates 0–10) with review pauses by level, a final test evaluation, and an ML Test Score |
 | — | [benchmark-e2e](plugins/agentic-ml/skills/benchmark-e2e/SKILL.md) | Meta | Compare E2E workflow approaches (no-plugin/plugin/automl) across scenarios (hard-fraud, hard-readmission, xhard-churn) to measure agent reliability, pitfall detection, and cost |
@@ -136,6 +137,8 @@ When run via `orchestrate-e2e`, all skill artifacts are collected in `--out-dir`
 uv run plugins/agentic-ml/skills/orchestrate-e2e/scripts/generate_report.py <out-dir>
 # → <out-dir>/report.html
 ```
+
+At each review pause, `build-review-page` writes short pages to `<out-dir>/review/` for the person approving the gate. Each answers one question (what am I approving, what is predicted and when, is the split leak-free, does it beat the baseline, where is it wrong, what does the cutoff cost, what else was tried). `check_page.py` fails a page whose numbers differ from the artifacts or whose artifacts changed after it was built.
 
 The report includes a gate timeline, the level and approach, the evidence notebook with its verify status, an ML Test Score panel, metrics with confidence intervals, provenance, per-skill cards with findings tables, and raw JSON tabs.
 

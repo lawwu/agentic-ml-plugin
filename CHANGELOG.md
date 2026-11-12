@@ -8,6 +8,19 @@ The format follows the categories used in the automated release workflow (`.gith
 
 ## [Unreleased]
 
+### 🛠 Skills & Features
+
+- feat: add `build-review-page` skill — one-minute HTML pages for the person approving a gate, one question per page (`decision`, `label`, `split`, `baseline`, `errors`, `value`, `tried`). Every number is bound to a field of a skill artifact; `check_page.py` fails a page that disagrees with its artifacts, is older than them, loads outside files, or runs over the word limit. `check_page.py --fill` writes artifact values into the page, so the model never types a number. Each page lists the judgments only a person can make and the conditions under which to distrust it, and reviewer replies are recorded per claim in `review/responses.jsonl`
+- feat: `orchestrate-e2e` builds the `decision` page before each review pause and shows its path on the review card; `report.html` lists `build-review-page`
+
+### 🔧 Maintenance
+
+- test: add skill evals under `plugins/agentic-ml/evals/` for `claude plugin eval` — three cases with a planted fact and known right answer (two for `select-approach`, one for `build-review-page`), conventions for writing more, and `summarize.py` for a per-skill table of with-plugin and without-plugin scores, planted and clean pass counts, and cost
+
+### 📚 Documentation
+
+- docs: add Review Page and Review Verdict vocabulary; add the `build-review-page` schema and the reviewer-response line format
+
 ---
 
 ## [0.4.0] — 2026-11-04

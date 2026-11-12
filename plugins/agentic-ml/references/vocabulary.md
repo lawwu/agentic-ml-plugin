@@ -91,3 +91,27 @@ See [levels.md](levels.md). Changes communication and autonomy, never thresholds
 | `non-ml` | Rule-1 floor: no trained or pre-trained model |
 | `statistical` | Classical statistical model (e.g. ETS, ARIMA, Theta) |
 | `foundation-model` | Pre-trained model used zero-shot (e.g. a time-series foundation model) |
+
+## Review Page
+
+Used by `build-review-page`. Each page answers one question.
+
+| Value | The question |
+|---|---|
+| `decision` | What am I approving, and why? |
+| `label` | What is predicted, and when is the truth known? |
+| `split` | Why can't the test rows have informed the model? |
+| `baseline` | Is it better than the simple alternative, beyond noise? |
+| `errors` | Where is it wrong? |
+| `value` | What does acting at this cutoff cost and gain? |
+| `tried` | What else was tried, and how many looks were taken? |
+
+## Review Verdict
+
+A reviewer's reply to one claim on a review page (`review/responses.jsonl`). It is not a gate decision.
+
+| Value | Meaning |
+|---|---|
+| `accepted` | The reviewer agrees with the claim |
+| `changes-requested` | The claim needs rework by the skill that owns the artifact, then a rebuilt page |
+| `rejected` | The reviewer does not accept the claim; the gate cannot rest on it |

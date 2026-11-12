@@ -443,6 +443,41 @@ Written to: `<out-dir>/demonstrate-value.json`
 
 ---
 
+### `build-review-page`
+
+Written to: `<out-dir>/build-review-page.json`
+
+```json
+{
+  "gate": "<gate number under review, or null>",
+  "pages": [
+    {
+      "page": "decision | label | split | baseline | errors | value | tried",
+      "path": "<out-dir>/review/<page>.html",
+      "sha256": "<sha256 of the page>",
+      "sources": ["check-eval.json", "build-baseline.json"],
+      "check": {"ok": true, "words": 211, "refs_checked": 19, "refs_existence_only": 1, "literals": 0, "unbound_numbers": 0},
+      "browser_verified": true
+    }
+  ],
+  "omitted": [{"page": "<page>", "reason": "<missing artifact or field, and the skill that would produce it>"}],
+  "entry_page": "<out-dir>/review/decision.html",
+  "responses_path": "<out-dir>/review/responses.jsonl"
+}
+```
+
+`decision` describes the pages, not the model: `GO` when every requested page passed `check_page.py --strict`, `CONDITIONAL` when a page was omitted, `NO-GO` when a page failed and must not be shown. `provenance` is omitted.
+
+Each page binds the values it shows to artifact fields with `data-ref="<file>#<JSON pointer>"` and carries the sha256 of every artifact it read in a `<script type="application/json" id="review-sources">` block, so a page that disagrees with its artifacts, or is older than them, fails the check.
+
+Reviewer replies are appended to `<out-dir>/review/responses.jsonl`, one JSON object per line:
+
+```json
+{"page": "<page>", "claim": "<tag on the page, e.g. B2>", "verdict": "accepted | changes-requested | rejected", "comment": "<the reviewer's words>", "reviewer": "<name>", "at": "<ISO-8601 UTC>", "page_sha256": "<sha256 of the page they read>"}
+```
+
+---
+
 ### `recommend-new-approaches`
 
 Written to: `<out-dir>/recommend-new-approaches.json`
@@ -556,7 +591,7 @@ Written to: `<out-dir>/run-summary.json`
   "gates": [
     {
       "gate_number": "0-10, or \"4b\"",
-      "gate_name": "select-approach | review-target | check-dataset-quality | build-baseline | plan-experiment | feature-engineer | check-data-pipeline | train-model | babysit-training | check-failed-run | check-eval | explain-model | check-deployment-readiness | demonstrate-value | recommend-new-approaches",
+      "gate_name": "select-approach | review-target | check-dataset-quality | build-baseline | plan-experiment | feature-engineer | check-data-pipeline | train-model | babysit-training | check-failed-run | check-eval | explain-model | check-deployment-readiness | demonstrate-value | recommend-new-approaches | build-review-page",
       "status": "PASS | FAIL | SKIPPED | PENDING",
       "artifact_path": "<out-dir>/<skill-name>.json",
       "timestamp": "<ISO-8601>",

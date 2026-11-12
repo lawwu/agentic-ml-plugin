@@ -72,6 +72,7 @@ Evidence (evidence.md § Gate <n>):
   1) <claim> — <command that shows it, and its output>
   2) ...
 Assumptions: <list, or "none">
+Page: <out-dir>/review/decision.html — asks you <n> things (omit the line if no page passed its check)
 Re-run: uvx showboat --workdir <out-dir> verify <out-dir>/evidence.md
 Reply "continue", or tell me what to change.
 ```

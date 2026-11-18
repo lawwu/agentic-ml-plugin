@@ -6,6 +6,7 @@ workflows:
     '.github/workflows/actions.yml':
         - 'actions/checkout@v7.0.1'
         - 'zizmorcore/zizmor-action@v0.8.1'
+    '.github/workflows/dependabot-security-merge.yml': []
     '.github/workflows/release.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/validate-frontmatter.yml':
